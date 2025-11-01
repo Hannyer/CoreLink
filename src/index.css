@@ -1,0 +1,79 @@
+/* ===== Shell general y fondos (combina con login) ===== */
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 600px at 110% -10%, rgba(34, 197, 94, 0.16), rgba(15, 23, 42, 0) 60%),
+    linear-gradient(135deg, #0b1220 0%, #0f172a 60%);
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+  color: #fff;
+  transition: width .25s ease-in-out;
+}
+.glass-sidebar {
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1) !important;
+}
+.sidebar .nav-link {
+  color: rgba(255,255,255,0.8);
+}
+.sidebar .nav-link:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+.sidebar .nav-link.active {
+  background: #22c55e;
+  color: #062415 !important;
+  font-weight: 700;
+}
+.sidebar-section small {
+  letter-spacing: .3px;
+}
+
+/* badge del brand */
+.brand-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+
+/* ===== Topbar ===== */
+.topbar {
+  background: rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+.topbar .form-control {
+  color: #fff;
+  background: transparent !important;
+}
+.topbar .form-control::placeholder {
+  color: rgba(255,255,255,.55);
+}
+
+/* ===== Content surface ===== */
+.content-surface {
+  background: transparent;
+}
+.glass-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+/* ===== Footer ===== */
+.bg-footer {
+  background: rgba(255,255,255,0.03);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ===== Ajustes de enlaces del sidebar (focus) ===== */
+.sidebar-link:focus {
+  outline: none;
+  box-shadow: 0 0 0 .2rem rgba(34,197,94,.25);
+}

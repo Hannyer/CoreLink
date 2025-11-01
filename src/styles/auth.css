@@ -1,0 +1,98 @@
+/* Fondo con gradiente + imagen en el lado izquierdo */
+.auth-bg {
+  background:
+    radial-gradient(1200px 600px at -10% 50%, rgba(34, 197, 94, 0.18), rgba(15, 23, 42, 0) 60%),
+    linear-gradient(135deg, #0b1220 0%, #0f172a 60%);
+  color: #fff;
+}
+
+.auth-hero {
+  flex: 1;
+  min-height: 100dvh;
+  background-image: linear-gradient(rgba(15,23,42,.55), rgba(15,23,42,.35)), var(--auth-image, url(''));
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+  border-right: 1px solid rgba(255,255,255,.06);
+}
+.auth-hero {
+  --auth-image: url('https://ilp.com.do/wp-content/uploads/2023/12/ComunidaddeayudaFE02-8ea83278-3329-4776-8040-b9f7fbb41160-1608084181-scaled.jpg');
+}
+
+.auth-card {
+  max-width: 420px;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.auth-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255,255,255,.75);
+  pointer-events: none;
+}
+
+.auth-input {
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+  height: 46px;
+  border-radius: 12px;
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+.auth-input::placeholder { color: rgba(255,255,255,.45); }
+.auth-input:focus {
+  border-color: rgba(34,197,94,.65) !important;
+  box-shadow: 0 0 0 0.2rem rgba(34,197,94,.15) !important;
+  background: rgba(255,255,255,0.08) !important;
+}
+
+.auth-eye {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255,255,255,.75);
+  padding: 6px 10px !important;
+}
+
+.logo-badge {
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+
+.auth-badge {
+  background-color: #22c55e !important;
+  color: #062415 !important;
+  padding: .5rem .75rem;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
+.auth-cta {
+  background-color: #22c55e !important;
+  color: #062415 !important;
+  border: none !important;
+  font-weight: 700;
+  height: 46px;
+  border-radius: 12px;
+}
+.auth-cta:disabled {
+  opacity: .8;
+}
+
+.ps-5 { padding-left: 2.5rem !important; }
+.pe-10 { padding-right: 3.25rem !important; }
+
+.text-white-75 { color: rgba(255,255,255,.75) !important; }

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { login } from "@/services/authService";
+import { login } from "@/services/authService"; 
 import type { AxiosError } from "axios";
 import { Eye, EyeOff, ShieldCheck, Mail, Lock } from "lucide-react";
 
@@ -22,17 +22,23 @@ const LoginPage = () => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
-      const res = await login({ username, password });
-      localStorage.setItem("token", res.token);
-      localStorage.setItem("user", res.user);
-      console.log(res.user)
+      // Normaliza entradas
+      const payload = { username: username.trim(), password };
+      console.log(payload)
+      // Llama a POST /api/auth/login (el servicio guarda token y user)
+      await login(payload);
+
+      // Redirige
       navigate(from, { replace: true });
     } catch (error) {
       const err = error as AxiosError<{ message?: string }>;
       const status = err.response?.status;
       const message =
-        err.response?.data?.message || err.message || "Error en el inicio de sesión";
+        err.response?.data?.message ||
+        err.message ||
+        "Error en el inicio de sesión";
       setError(`${message}${status ? ` (Código ${status})` : ""}`);
     } finally {
       setLoading(false);
@@ -41,18 +47,17 @@ const LoginPage = () => {
 
   return (
     <div className="min-vh-100 d-flex">
-      {/* Panel izquierdo con imagen/branding */}
       <div
-         className="d-none d-lg-flex flex-column justify-content-end text-white p-5"
-  style={{
-    flex: 1,
-    minHeight: "100dvh",
-    backgroundImage: `linear-gradient(rgba(15,23,42,.55), rgba(15,23,42,.3)), url(${bgUrl})`,
-    backgroundSize: "contain",      // <- muestra toda la imagen
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "left center",
-    backgroundColor: "#0a2a6b"      // color de fondo para zonas vacías
-  }}
+        className="d-none d-lg-flex flex-column justify-content-end text-white p-5"
+        style={{
+          flex: 1,
+          minHeight: "100dvh",
+          backgroundImage: `linear-gradient(rgba(15,23,42,.55), rgba(15,23,42,.3)), url(${bgUrl})`,
+          backgroundSize: "contain",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "left center",
+          backgroundColor: "#0a2a6b",
+        }}
       >
         <div className="mb-5">
           <div className="d-inline-flex align-items-center gap-2 mb-3">

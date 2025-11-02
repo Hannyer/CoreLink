@@ -1,55 +1,44 @@
 // src/services/authService.ts
-import axios from "axios";
+import api from "@/api/apiClient";
+import { setAuthToken, clearAuthToken } from "@/api/auth";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL; // ← toma la URL según el ambiente
-
-export interface LoginRequest {
-  username: string;
-  password: string;
+export interface ApiUser {
+  ID: number;
+  ID_Role: number;
+  Name: string;
+  Email: string;
+  Password?: string; 
 }
 
 export interface LoginResponse {
   token: string;
-  user: any; // tipa si tienes el modelo
+  user: ApiUser;
 }
 
-// axios instance (reutilizable)
-const api = axios.create({
-  baseURL: API_BASE,
-  headers: { "Content-Type": "application/json" },
-  timeout: 15000,
-});
-
-// Si ya hay token guardado, lo añadimos al iniciar
-const existingToken = localStorage.getItem("token");
-if (existingToken) {
-  api.defaults.headers.common.Authorization = `Bearer ${existingToken}`;
-}
-
-export async function login(payload: LoginRequest): Promise<LoginResponse> {
-  console.log(API_BASE)
+export async function login(payload: { username: string; password: string }): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>("/api/auth/login", payload);
-  // guarda sesión
+
+  // No persistir Password
+  const { Password: _omit, ...safeUser } = data.user;
+
   localStorage.setItem("token", data.token);
-  localStorage.setItem("user", JSON.stringify(data.user));
-  // setea header para siguientes requests
-  api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
-  return data;
+  localStorage.setItem("user", JSON.stringify(safeUser));
+  setAuthToken(data.token);
+
+  return { token: data.token, user: safeUser as ApiUser };
 }
 
 export function logout() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
-  delete api.defaults.headers.common.Authorization;
+  clearAuthToken();
+}
+
+export function getCurrentUser(): ApiUser | null {
+  const raw = localStorage.getItem("user");
+  return raw ? (JSON.parse(raw) as ApiUser) : null;
 }
 
 export function isAuthenticated(): boolean {
   return !!localStorage.getItem("token");
 }
-
-export function getCurrentUser() {
-  const raw = localStorage.getItem("user");
-  return raw ? JSON.parse(raw) : null;
-}
-
-export default api; 

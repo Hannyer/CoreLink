@@ -31,15 +31,19 @@ export default function MainLayout() {
   };
 
   useEffect(() => {
-    // inicializa tooltips si el sidebar está colapsado
+    // Inicializar tooltips SOLO cuando esté colapsado
+    let instances: any[] = [];
     if (collapsed && window.bootstrap) {
-      const els = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-      els.forEach((el) => new window.bootstrap.Tooltip(el));
+      const els = document.querySelectorAll<HTMLElement>('[data-bs-toggle="tooltip"]');
+      els.forEach((el) => {
+        const t = new window.bootstrap.Tooltip(el);
+        instances.push(t);
+      });
     }
     return () => {
-      // opcional: destruir tooltips para evitar fugas
-      const els = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-      els.forEach((el: any) => el?.dispose?.());
+      // Destruir instancias creadas en este ciclo
+      instances.forEach((t) => t.dispose?.());
+      instances = [];
     };
   }, [collapsed]);
 
@@ -151,8 +155,9 @@ export default function MainLayout() {
               </NavLink>
             </li>
             <li>
+              {/* OJO: aquí usamos /guides para que coincida con tu router */}
               <NavLink
-                to="/guias"
+                to="/guides"
                 className={linkCls}
                 data-bs-toggle={collapsed ? "tooltip" : undefined}
                 data-bs-placement="right"
@@ -218,8 +223,10 @@ export default function MainLayout() {
         </nav>
 
         <div className="mt-auto p-3 border-top border-opacity-10">
-          <button className="btn btn-outline-light w-100 d-flex align-items-center justify-content-center gap-2"
-                  onClick={handleLogout}>
+          <button
+            className="btn btn-outline-light w-100 d-flex align-items-center justify-content-center gap-2"
+            onClick={handleLogout}
+          >
             <LogOut size={18} />
             {!collapsed && "Salir"}
           </button>

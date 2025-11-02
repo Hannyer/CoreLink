@@ -1,5 +1,5 @@
-
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+// src/app/guards/Router.tsx
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import PrivateRoute from "./PrivateRoute";
 
@@ -7,34 +7,31 @@ import HomePage from "@/page/home/Home";
 import AboutPage from "@/page/about/About";
 import LoginPage from "@/page/Login/LoginPage";
 import SettingsPage from "@/page/settings/SettingsPage";
+import GuidesPage from "@/page/guides/GuidesPage";
 
 const router = createBrowserRouter([
+  // Público
+  { path: "/login", element: <LoginPage /> },
+  { path: "/", element: <Navigate to="/home" replace /> },
+
+  // Privado (todo lo que vive con layout)
   {
-    element: <MainLayout />,
+    element: (
+      <PrivateRoute>
+        <MainLayout />
+      </PrivateRoute>
+    ),
     children: [
       { path: "/home", element: <HomePage /> },
       { path: "/about", element: <AboutPage /> },
-      {
-        path: "/dashboard",
-        element: (
-          <PrivateRoute>
-            <h1>Zona Privada</h1>
-          </PrivateRoute>
-        ),
-      },
-       {
-        path: "/settings",
-        element: (
-          <PrivateRoute>
-            <SettingsPage />
-          </PrivateRoute>
-        ),
-      },
-      
+      { path: "/guides", element: <GuidesPage /> },    
+      { path: "/settings", element: <SettingsPage /> },
+      { path: "/dashboard", element: <h1>Zona Privada</h1> },
     ],
   },
-  { path: "/", element: <LoginPage /> },
-  { path: "/login", element: <LoginPage /> },
+
+  // 404
+  { path: "*", element: <h2 style={{ padding: 24 }}>404 • Página no encontrada</h2> },
 ]);
 
 export default function AppRouter() {

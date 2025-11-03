@@ -1,0 +1,138 @@
+import React, { type CSSProperties, type ReactNode } from "react";
+
+export type Column<T> = {
+  /** clave única de la columna */
+  key: string;
+  /** encabezado visible */
+  header: string;
+  /** alineación opcional */
+  align?: "left" | "center" | "right";
+  /** ancho opcional (ej. '160px' o '20%') */
+  width?: string;
+  /** render alterno para la celda */
+  render?: (row: T) => ReactNode;
+  /** acceso simple al campo si no usas render */
+  accessor?: (row: T) => ReactNode;
+};
+
+type TableCardProps<T> = {
+  title?: string;
+  loading?: boolean;
+  data: T[];
+  columns: Column<T>[];
+  rowKey: (row: T) => React.Key;
+  emptyText?: string;
+  headerExtra?: ReactNode; 
+  footer?: ReactNode;
+  hover?: boolean;
+};
+
+const wrapper: CSSProperties = { padding: "8px 12px" };
+
+const card: CSSProperties = {
+  background: "#ffffff",
+  borderRadius: "12px",
+  padding: "24px",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+  border: "1px solid rgba(0,0,0,0.06)",
+};
+
+const titleStyle: CSSProperties = { marginBottom: "14px", fontWeight: 600, color: "#0f172a" };
+
+const table: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: "0.95rem",
+  color: "#1e293b",
+};
+
+const thStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "12px 8px",
+  fontWeight: 600,
+  color: "#475569",
+  borderBottom: "1px solid rgba(0,0,0,0.06)",
+  background: "#f8fafc",
+  whiteSpace: "nowrap",
+};
+
+const tdStyle: CSSProperties = {
+  padding: "10px 8px",
+  borderBottom: "1px solid rgba(0,0,0,0.05)",
+  verticalAlign: "top",
+};
+
+const rowHover: CSSProperties = { transition: "background 0.2s ease" };
+
+export const badgeStyles = {
+  base: {
+    padding: "4px 10px",
+    borderRadius: "6px",
+    fontSize: "0.78rem",
+    fontWeight: 500,
+    display: "inline-block",
+  } as CSSProperties,
+  success: { background: "#ecfdf5", color: "#047857" } as CSSProperties,
+  danger: { background: "#fef2f2", color: "#b91c1c" } as CSSProperties,
+  warn: { background: "#fffbeb", color: "#b45309" } as CSSProperties,
+  info: { background: "#eff6ff", color: "#1d4ed8" } as CSSProperties,
+};
+
+export function TableCard<T>({
+  title,
+  loading,
+  data,
+  columns,
+  rowKey,
+  emptyText = "Sin datos",
+  headerExtra,
+  footer,
+  hover = true,
+}: TableCardProps<T>) {
+  return (
+    <div style={wrapper}>
+      <div style={card}>
+        {(title || headerExtra) && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            {title ? <h2 style={titleStyle}>{title}</h2> : <div />}
+            {headerExtra}
+          </div>
+        )}
+
+        {loading ? (
+          <p style={{ color: "#64748b" }}>Cargando…</p>
+        ) : data.length === 0 ? (
+          <div style={{ color: "#64748b", padding: "12px 4px" }}>{emptyText}</div>
+        ) : (
+          <table style={table}>
+            <thead>
+              <tr>
+                {columns.map((c) => (
+                  <th key={c.key} style={{ ...thStyle, textAlign: c.align ?? "left", width: c.width }}>{c.header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr
+                  key={rowKey(row)}
+                  style={hover ? rowHover : undefined}
+                  onMouseEnter={(e) => hover && (e.currentTarget.style.background = "#f9fafb")}
+                  onMouseLeave={(e) => hover && (e.currentTarget.style.background = "transparent")}
+                >
+                  {columns.map((c) => (
+                    <td key={c.key} style={{ ...tdStyle, textAlign: c.align ?? "left" }}>
+                      {c.render ? c.render(row) : c.accessor ? c.accessor(row) : null}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {footer && <div style={{ marginTop: 12 }}>{footer}</div>}
+      </div>
+    </div>
+  );
+}

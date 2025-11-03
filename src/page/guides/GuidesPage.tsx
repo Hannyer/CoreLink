@@ -52,7 +52,7 @@ export default function GuidesPage() {
   // Opcional: acciones en el header (ej. crear guía, filtros, exportar)
   const headerExtra = (
     <div style={{ display: "flex", gap: 8 }}>
-      {/* <button className="btn btn-primary btn-sm">Nuevo guía</button> */}
+      {<button className="btn btn-primary btn-sm">Nuevo guía</button> }
     </div>
   );
 

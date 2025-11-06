@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type ReactElement } from 'react';
 import { ConfirmDialog, type ConfirmVariant } from '@/components/ui/ConfirmDialog';
 
 export interface ConfirmOptions {
@@ -52,8 +52,8 @@ export function useConfirm() {
     setLoading(false);
   }, [resolvePromise]);
 
-  const ConfirmDialogComponent = useCallback(
-    () => (
+  const ConfirmDialogComponent = useCallback((): ReactElement => {
+    return (
       <ConfirmDialog
         isOpen={isOpen}
         onClose={handleCancel}
@@ -65,13 +65,11 @@ export function useConfirm() {
         cancelText={options.cancelText}
         loading={loading}
       />
-    ),
-    [isOpen, options, handleConfirm, handleCancel, loading]
-  );
+    );
+  }, [isOpen, options, handleConfirm, handleCancel, loading]);
 
   return {
     confirm,
     ConfirmDialogComponent,
   };
 }
-

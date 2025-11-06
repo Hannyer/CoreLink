@@ -9,6 +9,15 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// Interceptor de request: adjuntar token si existe
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Interceptor de respuesta: si 401 ⇒ limpiar y mandar a login
 api.interceptors.response.use(
   (r) => r,

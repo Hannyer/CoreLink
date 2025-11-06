@@ -9,8 +9,51 @@
 /* ===== Sidebar ===== */
 .sidebar {
   color: #fff;
-  transition: width .25s ease-in-out;
+  transition: width .25s ease-in-out, transform .3s ease-in-out;
 }
+
+/* Overlay para móvil */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+  backdrop-filter: blur(2px);
+}
+
+/* Sidebar responsive - móvil */
+@media (max-width: 767.98px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px !important;
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform .3s ease-in-out;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar.sidebar-closed {
+    transform: translateX(-100%);
+  }
+}
+
+/* Desktop: mantener comportamiento original */
+@media (min-width: 768px) {
+  .sidebar {
+    position: relative;
+    transform: none !important;
+  }
+}
+
 .glass-sidebar {
   backdrop-filter: blur(10px);
   background: rgba(255,255,255,0.05);

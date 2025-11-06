@@ -1,4 +1,7 @@
 import React, { type CSSProperties, type ReactNode } from "react";
+import { Loading } from "./Loading";
+import { Badge } from "./Badge";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export type Column<T> = {
   /** clave única de la columna */
@@ -13,6 +16,8 @@ export type Column<T> = {
   render?: (row: T) => ReactNode;
   /** acceso simple al campo si no usas render */
   accessor?: (row: T) => ReactNode;
+  /** ocultar en móvil */
+  hideOnMobile?: boolean;
 };
 
 type TableCardProps<T> = {
@@ -64,6 +69,7 @@ const tdStyle: CSSProperties = {
 
 const rowHover: CSSProperties = { transition: "background 0.2s ease" };
 
+// Exportar badgeStyles para compatibilidad hacia atrás
 export const badgeStyles = {
   base: {
     padding: "4px 10px",
@@ -78,6 +84,28 @@ export const badgeStyles = {
   info: { background: "#eff6ff", color: "#1d4ed8" } as CSSProperties,
 };
 
+const cardMobile: CSSProperties = {
+  background: "#ffffff",
+  borderRadius: "12px",
+  padding: "16px",
+  marginBottom: "12px",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+  border: "1px solid rgba(0,0,0,0.06)",
+};
+
+const cardTitleMobile: CSSProperties = {
+  fontSize: "0.875rem",
+  fontWeight: 600,
+  color: "#64748b",
+  marginBottom: "4px",
+};
+
+const cardValueMobile: CSSProperties = {
+  fontSize: "0.9375rem",
+  color: "#1e293b",
+  fontWeight: 500,
+};
+
 export function TableCard<T>({
   title,
   loading,
@@ -89,46 +117,76 @@ export function TableCard<T>({
   footer,
   hover = true,
 }: TableCardProps<T>) {
+  const isMobile = useMediaQuery('(max-width: 767.98px)');
+  const visibleColumns = isMobile ? columns.filter(c => !c.hideOnMobile) : columns;
+
   return (
     <div style={wrapper}>
       <div style={card}>
         {(title || headerExtra) && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "space-between", 
+            marginBottom: 12,
+            flexWrap: "wrap",
+            gap: "8px"
+          }}>
             {title ? <h2 style={titleStyle}>{title}</h2> : <div />}
             {headerExtra}
           </div>
         )}
 
         {loading ? (
-          <p style={{ color: "#64748b" }}>Cargando…</p>
+          <Loading variant="spinner" size="md" message="Cargando…" />
         ) : data.length === 0 ? (
-          <div style={{ color: "#64748b", padding: "12px 4px" }}>{emptyText}</div>
+          <div style={{ color: "#64748b", padding: "12px 4px", textAlign: "center" }}>{emptyText}</div>
+        ) : isMobile ? (
+          // Vista de cards para móvil
+          <div>
+            {data.map((row) => (
+              <div key={String(rowKey(row))} style={cardMobile}>
+                {visibleColumns.map((c) => {
+                  const value = c.render ? c.render(row) : c.accessor ? c.accessor(row) : null;
+                  return (
+                    <div key={c.key} style={{ marginBottom: "12px" }}>
+                      <div style={cardTitleMobile}>{c.header}</div>
+                      <div style={cardValueMobile}>{value}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         ) : (
-          <table style={table}>
-            <thead>
-              <tr>
-                {columns.map((c) => (
-                  <th key={c.key} style={{ ...thStyle, textAlign: c.align ?? "left", width: c.width }}>{c.header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row) => (
-                <tr
-                  key={rowKey(row)}
-                  style={hover ? rowHover : undefined}
-                  onMouseEnter={(e) => hover && (e.currentTarget.style.background = "#f9fafb")}
-                  onMouseLeave={(e) => hover && (e.currentTarget.style.background = "transparent")}
-                >
+          // Vista de tabla para desktop
+          <div style={{ overflowX: "auto" }}>
+            <table style={table}>
+              <thead>
+                <tr>
                   {columns.map((c) => (
-                    <td key={c.key} style={{ ...tdStyle, textAlign: c.align ?? "left" }}>
-                      {c.render ? c.render(row) : c.accessor ? c.accessor(row) : null}
-                    </td>
+                    <th key={c.key} style={{ ...thStyle, textAlign: c.align ?? "left", width: c.width }}>{c.header}</th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.map((row) => (
+                  <tr
+                    key={rowKey(row)}
+                    style={hover ? rowHover : undefined}
+                    onMouseEnter={(e) => hover && (e.currentTarget.style.background = "#f9fafb")}
+                    onMouseLeave={(e) => hover && (e.currentTarget.style.background = "transparent")}
+                  >
+                    {columns.map((c) => (
+                      <td key={c.key} style={{ ...tdStyle, textAlign: c.align ?? "left" }}>
+                        {c.render ? c.render(row) : c.accessor ? c.accessor(row) : null}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {footer && <div style={{ marginTop: 12 }}>{footer}</div>}

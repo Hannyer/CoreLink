@@ -1,0 +1,312 @@
+// Tipos para las entidades del sistema de gestión de operaciones turísticas
+
+// ============================================
+// RESERVATION (Reserva)
+// ============================================
+export type PaymentMethod = 
+  | 'cuenta_por_cobrar' 
+  | 'efectivo' 
+  | 'tarjeta' 
+  | 'transferencia_bancaria';
+
+export type ReservationClassification = 'niños' | 'adultos';
+
+export type ReservationStatus = 
+  | 'pendiente' 
+  | 'confirmada' 
+  | 'cancelada' 
+  | 'completada';
+
+export interface Reservation {
+  id: string;
+  referenceNumber: string; // Número de referencia único
+  clientName: string;
+  agencyName: string;
+  agencyCommissionPercentage?: number; // Porcentaje de comisión (0-100)
+  activityId: string;
+  activityName?: string; // Para mostrar en listas
+  schedule: string; // Horario (formato HH:mm)
+  date: string; // Fecha (formato ISO)
+  classification: ReservationClassification;
+  participantsCount: number; // Total de participantes
+  childrenCount?: number;
+  adultsCount?: number;
+  includesTransport: boolean;
+  pickupPointId?: string;
+  pickupPointName?: string;
+  pickupTime?: string; // Horario de recogida
+  notes?: string;
+  paymentMethod: PaymentMethod;
+  hasCommission: boolean;
+  commissionAmount?: number;
+  status: ReservationStatus;
+  assignedGuides?: GuideAssignment[];
+  vehicleId?: string;
+  vehicleName?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+// ============================================
+// ACTIVITY (Actividad Turística)
+// ============================================
+export interface Activity {
+  id: string;
+  name: string;
+  description?: string;
+  duration: number; // Duración en minutos
+  capacity: number; // Capacidad máxima
+  minCapacity?: number; // Capacidad mínima
+  price?: number;
+  adultPrice?: number;
+  childPrice?: number;
+  status: 'activa' | 'inactiva';
+  schedules?: Schedule[]; // Horarios disponibles
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// GUIDE (Guía)
+// ============================================
+export interface Guide {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  isLeader: boolean; // Guía Líder o Normal
+  maxPartySize?: number; // Máximo de personas que puede guiar
+  status: 'activo' | 'inactivo';
+  assignments?: GuideAssignment[]; // Asignaciones actuales
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// GUIDE ASSIGNMENT (Asignación de Guía)
+// ============================================
+export interface GuideAssignment {
+  id: string;
+  reservationId: string;
+  guideId: string;
+  guideName?: string;
+  date: string; // Fecha de la asignación
+  isLeader: boolean;
+  assignedBy?: string; // Usuario que hizo la asignación
+  assignedAt: string;
+  notes?: string;
+}
+
+// ============================================
+// VEHICLE (Unidad de Transporte)
+// ============================================
+export type VehicleStatus = 'activo' | 'fuera_de_circulacion' | 'mantenimiento';
+
+export interface Vehicle {
+  id: string;
+  model: string;
+  brand?: string;
+  capacity: number; // Capacidad de pasajeros
+  licensePlate: string;
+  year?: number;
+  status: VehicleStatus;
+  lastMaintenance?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// PICKUP POINT (Punto de Recogida)
+// ============================================
+export interface PickupPoint {
+  id: string;
+  name: string;
+  address: string;
+  description?: string;
+  availableTimes: string[]; // Horarios disponibles (formato HH:mm)
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// SCHEDULE (Horario)
+// ============================================
+export type DayOfWeek = 
+  | 'lunes' 
+  | 'martes' 
+  | 'miercoles' 
+  | 'jueves' 
+  | 'viernes' 
+  | 'sabado' 
+  | 'domingo';
+
+export interface Schedule {
+  id: string;
+  activityId: string;
+  activityName?: string;
+  time: string; // Horario (formato HH:mm)
+  dayOfWeek?: DayOfWeek; // Para horarios recurrentes
+  date?: string; // Para horarios específicos
+  isActive: boolean;
+  capacity?: number; // Capacidad específica para este horario
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// REPORT (Reporte)
+// ============================================
+export interface ReservationReport {
+  date: string;
+  totalReservations: number;
+  totalClients: number;
+  totalRevenue?: number;
+  reservations: Reservation[];
+}
+
+export interface CommissionReport {
+  agencyName: string;
+  totalReservations: number;
+  totalCommission: number;
+  period: {
+    start: string;
+    end: string;
+  };
+  reservations: Reservation[];
+}
+
+export interface DailyReport {
+  date: string;
+  reservations: Reservation[];
+  activities: {
+    activityId: string;
+    activityName: string;
+    count: number;
+  }[];
+  guides: {
+    guideId: string;
+    guideName: string;
+    assignmentsCount: number;
+  }[];
+  vehicles: {
+    vehicleId: string;
+    vehicleName: string;
+    assignmentsCount: number;
+  }[];
+}
+
+// ============================================
+// FILTERS (Filtros)
+// ============================================
+export interface ReservationFilters {
+  referenceNumber?: string;
+  clientName?: string;
+  agencyName?: string;
+  activityId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  status?: ReservationStatus;
+  paymentMethod?: PaymentMethod;
+  hasCommission?: boolean;
+  includesTransport?: boolean;
+}
+
+export interface ActivityFilters {
+  name?: string;
+  status?: 'activa' | 'inactiva';
+}
+
+export interface GuideFilters {
+  name?: string;
+  isLeader?: boolean;
+  status?: 'activo' | 'inactivo';
+}
+
+export interface VehicleFilters {
+  model?: string;
+  status?: VehicleStatus;
+}
+
+// ============================================
+// FORM DATA (Datos de Formularios)
+// ============================================
+export interface ReservationFormData {
+  clientName: string;
+  agencyName: string;
+  agencyCommissionPercentage?: number;
+  activityId: string;
+  schedule: string;
+  date: string;
+  classification: ReservationClassification;
+  participantsCount: number;
+  childrenCount?: number;
+  adultsCount?: number;
+  includesTransport: boolean;
+  pickupPointId?: string;
+  pickupTime?: string;
+  notes?: string;
+  paymentMethod: PaymentMethod;
+  hasCommission: boolean;
+}
+
+export interface ActivityFormData {
+  name: string;
+  description?: string;
+  duration: number;
+  capacity: number;
+  minCapacity?: number;
+  price?: number;
+  adultPrice?: number;
+  childPrice?: number;
+  status: 'activa' | 'inactiva';
+}
+
+export interface GuideFormData {
+  name: string;
+  email?: string;
+  phone?: string;
+  isLeader: boolean;
+  maxPartySize?: number;
+  status: 'activo' | 'inactivo';
+}
+
+export interface VehicleFormData {
+  model: string;
+  brand?: string;
+  capacity: number;
+  licensePlate: string;
+  year?: number;
+  status: VehicleStatus;
+  lastMaintenance?: string;
+  notes?: string;
+}
+
+export interface PickupPointFormData {
+  name: string;
+  address: string;
+  description?: string;
+  availableTimes: string[];
+  isActive: boolean;
+}
+
+// ============================================
+// API RESPONSES
+// ============================================
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface ApiError {
+  message: string;
+  code?: string;
+  details?: Record<string, any>;
+}
+

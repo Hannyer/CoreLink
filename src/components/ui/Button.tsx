@@ -37,8 +37,8 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   },
   outline: {
     background: 'transparent',
-    color: '#fff',
-    border: '1px solid rgba(255,255,255,0.3)',
+    color: '#475569',
+    border: '1px solid #cbd5e1',
   },
   ghost: {
     background: 'transparent',
@@ -83,7 +83,11 @@ const hoverStyles: Record<ButtonVariant, React.CSSProperties> = {
   secondary: { background: 'rgba(255,255,255,0.15)' },
   success: { background: '#16a34a', transform: 'translateY(-1px)' },
   danger: { background: '#dc2626', transform: 'translateY(-1px)' },
-  outline: { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.5)' },
+  outline: { 
+    background: '#f1f5f9', 
+    borderColor: '#94a3b8',
+    color: '#334155',
+  },
   ghost: { background: 'rgba(255,255,255,0.08)' },
 };
 

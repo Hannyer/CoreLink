@@ -56,14 +56,14 @@ const thStyle: CSSProperties = {
   padding: "12px 8px",
   fontWeight: 600,
   color: "#475569",
-  borderBottom: "1px solid rgba(0,0,0,0.06)",
+  borderBottom: "2px solid #e2e8f0",
   background: "#f8fafc",
   whiteSpace: "nowrap",
 };
 
 const tdStyle: CSSProperties = {
   padding: "10px 8px",
-  borderBottom: "1px solid rgba(0,0,0,0.05)",
+  borderBottom: "1px solid #e2e8f0",
   verticalAlign: "top",
 };
 
@@ -174,7 +174,7 @@ export function TableCard<T>({
                   <tr
                     key={rowKey(row)}
                     style={hover ? rowHover : undefined}
-                    onMouseEnter={(e) => hover && (e.currentTarget.style.background = "#f9fafb")}
+                    onMouseEnter={(e) => hover && (e.currentTarget.style.background = "#f1f5f9")}
                     onMouseLeave={(e) => hover && (e.currentTarget.style.background = "transparent")}
                   >
                     {columns.map((c) => (

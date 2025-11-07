@@ -32,6 +32,7 @@ function mapApiGuideToGuide(apiGuide: any): Guide {
 /**
  * Lista todas las guías (endpoint GET /api/guides)
  * Compatible con la funcionalidad de GuidesPage.tsx
+ * @deprecated Usar fetchGuidesPaginated() para obtener respuesta paginada
  */
 export async function fetchGuides(): Promise<Guide[]> {
   const { data } = await api.get<any>("/api/guides");
@@ -48,6 +49,39 @@ export async function fetchGuides(): Promise<Guide[]> {
   }
 
   return list.map(mapApiGuideToGuide);
+}
+
+/**
+ * Lista guías con paginación (endpoint GET /api/guides)
+ * Ahora el endpoint devuelve respuesta paginada
+ */
+export async function fetchGuidesWithPagination(
+  page: number = 1,
+  limit: number = 10
+): Promise<PaginatedResponse<Guide>> {
+  const { data } = await api.get<any>("/api/guides", {
+    params: { page, limit },
+  });
+  
+  // Mapear la respuesta del API al formato PaginatedResponse
+  if (data.items && Array.isArray(data.items)) {
+    return {
+      items: data.items.map(mapApiGuideToGuide),
+      total: data.pagination?.total || data.total || 0,
+      page: data.pagination?.page || data.page || page,
+      pageSize: data.pagination?.limit || data.limit || data.pageSize || limit,
+      totalPages: data.pagination?.totalPages || data.totalPages || 1,
+    };
+  }
+
+  // Fallback: si no hay items, devolver respuesta vacía
+  return {
+    items: [],
+    total: 0,
+    page: page,
+    pageSize: limit,
+    totalPages: 0,
+  };
 }
 
 /**

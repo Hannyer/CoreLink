@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { TableCard, badgeStyles, type Column } from "@/components/ui/TableCard";
-import { fetchGuidesWithPagination, createGuide, updateGuide, deleteGuide } from "@/services/guideService";
+import { fetchTransportsWithPagination, createTransport, updateTransport, deleteTransport } from "@/services/transportService";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -9,7 +9,7 @@ import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus } from "lucide-react";
-import type { Guide, GuideFormData } from "@/types/entities";
+import type { Transport, TransportFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
 
 /**
@@ -31,11 +31,11 @@ function getErrorMessage(error: unknown): string {
   return "Ha ocurrido un error. Por favor, intenta nuevamente.";
 }
 
-export default function GuidesPage() {
-  const [guides, setGuides] = useState<Guide[]>([]);
+export default function TransportsPage() {
+  const [transports, setTransports] = useState<Transport[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editingGuide, setEditingGuide] = useState<Guide | null>(null);
+  const [editingTransport, setEditingTransport] = useState<Transport | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const { confirm, ConfirmDialogComponent } = useConfirm();
   const toast = useToastContext();
@@ -46,28 +46,26 @@ export default function GuidesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const [formData, setFormData] = useState<GuideFormData>({
-    name: "",
-    email: "",
-    phone: "",
-    isLeader: false,
-    maxPartySize: undefined,
-    status: "activo",
+  const [formData, setFormData] = useState<TransportFormData>({
+    model: "",
+    capacity: 1,
+    operationalStatus: true,
+    status: true,
   });
 
   useEffect(() => {
-    loadGuides();
+    loadTransports();
   }, [page, pageSize]);
 
-  const loadGuides = async () => {
+  const loadTransports = async () => {
     try {
       setLoading(true);
-      const response = await fetchGuidesWithPagination(page, pageSize);
-      setGuides(response.items);
+      const response = await fetchTransportsWithPagination(page, pageSize);
+      setTransports(response.items);
       setTotalPages(response.totalPages);
       setTotal(response.total);
     } catch (error) {
-      console.error("Error al cargar guías:", error);
+      console.error("Error al cargar transportes:", error);
       toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -75,35 +73,31 @@ export default function GuidesPage() {
   };
 
   const handleCreate = () => {
-    setEditingGuide(null);
+    setEditingTransport(null);
     setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      isLeader: false,
-      maxPartySize: undefined,
-      status: "activo",
+      model: "",
+      capacity: 1,
+      operationalStatus: true,
+      status: true,
     });
     setShowModal(true);
   };
 
-  const handleEdit = (guide: Guide) => {
-    setEditingGuide(guide);
+  const handleEdit = (transport: Transport) => {
+    setEditingTransport(transport);
     setFormData({
-      name: guide.name,
-      email: guide.email || "",
-      phone: guide.phone || "",
-      isLeader: guide.isLeader,
-      maxPartySize: guide.maxPartySize ?? undefined,
-      status: guide.status, // Ya es 'activo' | 'inactivo'
+      model: transport.model,
+      capacity: transport.capacity,
+      operationalStatus: transport.operationalStatus,
+      status: transport.status,
     });
     setShowModal(true);
   };
 
   const handleDeleteClick = async (id: string) => {
     const confirmed = await confirm({
-      title: "Eliminar Guía",
-      message: "¿Estás seguro de que deseas eliminar este guía? Esta acción no se puede deshacer.",
+      title: "Eliminar Transporte",
+      message: "¿Estás seguro de que deseas eliminar este transporte? Esta acción no se puede deshacer.",
       variant: "danger",
       confirmText: "Eliminar",
       cancelText: "Cancelar",
@@ -111,19 +105,19 @@ export default function GuidesPage() {
 
     if (confirmed) {
       try {
-        await deleteGuide(id);
-        toast.success("Guía eliminada correctamente");
+        await deleteTransport(id);
+        toast.success("Transporte eliminado correctamente");
         
         // Si solo hay un elemento en la página actual y no es la primera página,
         // volver a la página anterior después de eliminar
-        const currentPageItemCount = guides.length;
+        const currentPageItemCount = transports.length;
         if (currentPageItemCount === 1 && page > 1) {
           setPage(page - 1);
         } else {
-          await loadGuides();
+          await loadTransports();
         }
       } catch (error) {
-        console.error("Error al eliminar guía:", error);
+        console.error("Error al eliminar transporte:", error);
         toast.error(getErrorMessage(error));
       }
     }
@@ -132,69 +126,72 @@ export default function GuidesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
-      toast.error("El nombre es requerido");
+    if (!formData.model.trim()) {
+      toast.error("El modelo es requerido");
+      return;
+    }
+
+    if (!formData.capacity || formData.capacity < 1) {
+      toast.error("La capacidad debe ser mayor a 0");
       return;
     }
 
     try {
       setFormLoading(true);
       
-      // Convertir status de 'activo'|'inactivo' a boolean para el servicio
-      const payload: GuideFormData = {
-        ...formData,
-        email: formData.email || undefined,
-        phone: formData.phone || undefined,
+      const payload: TransportFormData = {
+        model: formData.model.trim(),
+        capacity: formData.capacity,
+        operationalStatus: formData.operationalStatus,
+        status: formData.status,
       };
 
-      if (editingGuide) {
-        await updateGuide(editingGuide.id, payload);
-        toast.success("Guía actualizada correctamente");
+      if (editingTransport) {
+        await updateTransport(editingTransport.id, payload);
+        toast.success("Transporte actualizado correctamente");
       } else {
-        await createGuide(payload);
-        toast.success("Guía creada correctamente");
+        await createTransport(payload);
+        toast.success("Transporte creado correctamente");
       }
 
       setShowModal(false);
-      await loadGuides();
+      await loadTransports();
     } catch (error) {
-      console.error("Error al guardar guía:", error);
+      console.error("Error al guardar transporte:", error);
       toast.error(getErrorMessage(error));
     } finally {
       setFormLoading(false);
     }
   };
 
-  const columns: Column<Guide>[] = [
-    { key: "name", header: "Nombre", accessor: (g) => g.name },
-    { key: "email", header: "Email", accessor: (g) => g.email || "-" },
-    { key: "phone", header: "Teléfono", accessor: (g) => g.phone || "-" },
+  const columns: Column<Transport>[] = [
+    { key: "model", header: "Modelo", accessor: (t) => t.model },
     {
-      key: "isLeader",
-      header: "Líder",
+      key: "capacity",
+      header: "Capacidad",
       width: "120px",
       align: "center",
-      render: (g) => (
-        <span style={{ ...badgeStyles.base, ...(g.isLeader ? badgeStyles.success : badgeStyles.danger) }}>
-          {g.isLeader ? "Sí" : "No"}
-        </span>
-      ),
+      accessor: (t) => t.capacity,
     },
     {
-      key: "maxPartySize",
-      header: "Máx. Personas",
-      width: "140px",
+      key: "operationalStatus",
+      header: "Estado Operacional",
+      width: "160px",
       align: "center",
-      accessor: (g) => (g.maxPartySize ?? "-"),
+      render: (t) => (
+        <span style={{ ...badgeStyles.base, ...(t.operationalStatus ? badgeStyles.success : badgeStyles.danger) }}>
+          {t.operationalStatus ? "Operativo" : "No Operativo"}
+        </span>
+      ),
     },
     {
       key: "status",
       header: "Estado",
       width: "120px",
       align: "center",
-      render: (g) => (
-        <span style={{ ...badgeStyles.base, ...(g.status === 'activo' ? badgeStyles.success : badgeStyles.danger) }}>
-          {g.status === 'activo' ? "Activo" : "Inactivo"}
+      render: (t) => (
+        <span style={{ ...badgeStyles.base, ...(t.status ? badgeStyles.success : badgeStyles.danger) }}>
+          {t.status ? "Activo" : "Inactivo"}
         </span>
       ),
     },
@@ -203,19 +200,19 @@ export default function GuidesPage() {
       header: "Acciones",
       width: "140px",
       align: "center",
-      render: (g) => (
+      render: (t) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleEdit(g)}
+            onClick={() => handleEdit(t)}
             icon={<Edit size={16} />}
             style={{ padding: "4px 8px" }}
           />
           <Button
             variant="danger"
             size="sm"
-            onClick={() => handleDeleteClick(g.id)}
+            onClick={() => handleDeleteClick(t.id)}
             icon={<Trash2 size={16} />}
             style={{ padding: "4px 8px" }}
           />
@@ -227,20 +224,20 @@ export default function GuidesPage() {
   const headerExtra = (
     <div style={{ display: "flex", gap: 8 }}>
       <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
-        Nuevo guía
+        Nuevo transporte
       </Button>
     </div>
   );
 
   return (
     <>
-      <TableCard<Guide>
-        title="Lista de guías"
+      <TableCard<Transport>
+        title="Lista de transportes"
         loading={loading}
-        data={guides}
+        data={transports}
         columns={columns}
-        rowKey={(g) => g.id}
-        emptyText="No hay guías aún"
+        rowKey={(t) => t.id}
+        emptyText="No hay transportes aún"
         headerExtra={headerExtra}
         footer={
           <Pagination
@@ -259,71 +256,54 @@ export default function GuidesPage() {
         }
       />
 
-      {/* Modal para crear/editar guía */}
+      {/* Modal para crear/editar transporte */}
       <Modal
         isOpen={showModal}
         onClose={() => !formLoading && setShowModal(false)}
-        title={editingGuide ? "Editar Guía" : "Nuevo Guía"}
+        title={editingTransport ? "Editar Transporte" : "Nuevo Transporte"}
         size="md"
         closeOnBackdropClick={!formLoading}
         showCloseButton={!formLoading}
       >
         <form onSubmit={handleSubmit}>
           <FormInput
-            label="Nombre"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            label="Modelo"
+            value={formData.model}
+            onChange={(e) => setFormData({ ...formData, model: e.target.value })}
             required
             fullWidth
             disabled={formLoading}
+            placeholder="Ej: Toyota Hiace 2020"
           />
 
           <FormInput
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            fullWidth
-            disabled={formLoading}
-          />
-
-          <FormInput
-            label="Teléfono"
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            fullWidth
-            disabled={formLoading}
-          />
-
-          <FormInput
-            label="Máximo de Personas"
+            label="Capacidad"
             type="number"
-            value={formData.maxPartySize || ""}
+            value={formData.capacity}
             onChange={(e) =>
               setFormData({
                 ...formData,
-                maxPartySize: e.target.value ? parseInt(e.target.value) : undefined,
+                capacity: e.target.value ? parseInt(e.target.value) : 1,
               })
             }
             min={1}
+            required
             fullWidth
             disabled={formLoading}
+            placeholder="Número de pasajeros"
           />
 
           <FormCheckbox
-            label="Es Líder"
-            checked={formData.isLeader}
-            onChange={(e) => setFormData({ ...formData, isLeader: e.target.checked })}
+            label="Estado Operacional"
+            checked={formData.operationalStatus}
+            onChange={(e) => setFormData({ ...formData, operationalStatus: e.target.checked })}
             disabled={formLoading}
           />
 
           <FormCheckbox
             label="Activo"
-            checked={formData.status === "activo"}
-            onChange={(e) =>
-              setFormData({ ...formData, status: e.target.checked ? "activo" : "inactivo" })
-            }
+            checked={formData.status}
+            onChange={(e) => setFormData({ ...formData, status: e.target.checked })}
             disabled={formLoading}
           />
 
@@ -344,7 +324,7 @@ export default function GuidesPage() {
               Cancelar
             </Button>
             <Button type="submit" loading={formLoading}>
-              {editingGuide ? "Guardar Cambios" : "Crear Guía"}
+              {editingTransport ? "Guardar Cambios" : "Crear Transporte"}
             </Button>
           </div>
         </form>
@@ -354,3 +334,4 @@ export default function GuidesPage() {
     </>
   );
 }
+

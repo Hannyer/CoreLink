@@ -232,6 +232,25 @@ export interface VehicleFilters {
 }
 
 // ============================================
+// TRANSPORT (Transporte)
+// ============================================
+export interface Transport {
+  id: string;
+  model: string;
+  capacity: number; // Capacidad de pasajeros
+  operationalStatus: boolean; // Estado operacional
+  status: boolean; // Estado general (activo/inactivo)
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransportFilters {
+  model?: string;
+  operationalStatus?: boolean;
+  status?: boolean;
+}
+
+// ============================================
 // FORM DATA (Datos de Formularios)
 // ============================================
 export interface ReservationFormData {
@@ -291,6 +310,13 @@ export interface PickupPointFormData {
   description?: string;
   availableTimes: string[];
   isActive: boolean;
+}
+
+export interface TransportFormData {
+  model: string;
+  capacity: number;
+  operationalStatus?: boolean;
+  status?: boolean;
 }
 
 // ============================================

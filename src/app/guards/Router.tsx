@@ -8,6 +8,7 @@ import AboutPage from "@/page/about/About";
 import LoginPage from "@/page/Login/LoginPage";
 import SettingsPage from "@/page/settings/SettingsPage";
 import GuidesPage from "@/page/guides/GuidesPage";
+import TransportsPage from "@/page/transports/TransportsPage";
 
 const router = createBrowserRouter([
   // Público
@@ -24,7 +25,8 @@ const router = createBrowserRouter([
     children: [
       { path: "/home", element: <HomePage /> },
       { path: "/about", element: <AboutPage /> },
-      { path: "/guides", element: <GuidesPage /> },    
+      { path: "/guides", element: <GuidesPage /> },
+      { path: "/transports", element: <TransportsPage /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "/dashboard", element: <h1>Zona Privada</h1> },
     ],

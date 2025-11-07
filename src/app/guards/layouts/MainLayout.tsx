@@ -196,15 +196,15 @@ export default function MainLayout() {
             </li>
             <li>
               <NavLink
-                to="/transporte"
+                to="/transports"
                 className={linkCls}
                 data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
                 data-bs-placement="right"
-                title={collapsed && !isMobile ? "Transporte" : undefined}
+                title={collapsed && !isMobile ? "Transportes" : undefined}
                 onClick={handleNavClick}
               >
                 <BusFront size={20} />
-                {(!collapsed || isMobile) && "Transporte"}
+                {(!collapsed || isMobile) && "Transportes"}
               </NavLink>
             </li>
             <li>

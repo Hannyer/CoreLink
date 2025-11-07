@@ -11,33 +11,119 @@ import type {
 // CRUD de Guías
 // ============================================
 
-export async function fetchGuides(
+/**
+ * Función auxiliar para mapear la respuesta del API al formato del frontend
+ */
+function mapApiGuideToGuide(apiGuide: any): Guide {
+  return {
+    id: apiGuide.id,
+    name: apiGuide.fullName || apiGuide.name,
+    email: apiGuide.email || undefined,
+    phone: apiGuide.phone || undefined,
+    // Manejar tanto camelCase como minúsculas del API
+    isLeader: apiGuide.isLeader ?? apiGuide.isleader ?? apiGuide.is_leader ?? false,
+    maxPartySize: apiGuide.maxPartySize ?? apiGuide.maxpartysize ?? apiGuide.max_party_size ?? undefined,
+    status: apiGuide.status ? 'activo' : 'inactivo',
+    createdAt: apiGuide.createdAt || new Date().toISOString(),
+    updatedAt: apiGuide.updatedAt || new Date().toISOString(),
+  };
+}
+
+/**
+ * Lista todas las guías (endpoint GET /api/guides)
+ * Compatible con la funcionalidad de GuidesPage.tsx
+ */
+export async function fetchGuides(): Promise<Guide[]> {
+  const { data } = await api.get<any>("/api/guides");
+  
+  // Manejar diferentes formatos de respuesta del API
+  const list = Array.isArray(data?.items)
+    ? data.items
+    : Array.isArray(data)
+    ? data
+    : [];
+
+  if (!Array.isArray(list)) {
+    throw new Error("La API no está devolviendo un array en /api/guides");
+  }
+
+  return list.map(mapApiGuideToGuide);
+}
+
+/**
+ * Lista guías con filtros y paginación (endpoint POST /api/guides/list)
+ */
+export async function fetchGuidesPaginated(
   filters?: GuideFilters & { page?: number; pageSize?: number }
 ): Promise<PaginatedResponse<Guide>> {
-  const { data } = await api.post<PaginatedResponse<Guide>>("/api/guides/list", filters || {});
+  const { data } = await api.post<any>("/api/guides/list", filters || {});
+  
+  // Mapear los items de la respuesta paginada
+  if (data.items && Array.isArray(data.items)) {
+    return {
+      ...data,
+      items: data.items.map(mapApiGuideToGuide),
+    };
+  }
+  
   return data;
 }
 
+/**
+ * Obtiene todas las guías sin paginación (endpoint GET /api/guides)
+ * @deprecated Usar fetchGuides() en su lugar
+ */
 export async function getAllGuides(): Promise<Guide[]> {
-  const { data } = await api.get<Guide[]>("/api/guides");
-  return data;
+  return fetchGuides();
 }
 
+/**
+ * Obtiene una guía por ID (endpoint GET /api/guides/{id})
+ */
 export async function getGuide(id: string): Promise<Guide> {
-  const { data } = await api.get<Guide>(`/api/guides/${id}`);
-  return data;
+  const { data } = await api.get<any>(`/api/guides/${id}`);
+  return mapApiGuideToGuide(data);
 }
 
+/**
+ * Crea una nueva guía (endpoint POST /api/guides)
+ */
 export async function createGuide(payload: GuideFormData): Promise<Guide> {
-  const { data } = await api.post<Guide>("/api/guides", payload);
-  return data;
+  // Mapear formato del frontend al formato del API
+  const apiPayload = {
+    fullName: payload.name,
+    email: payload.email || undefined,
+    phone: payload.phone || undefined,
+    isLeader: payload.isLeader,
+    status: payload.status === 'activo',
+    maxPartySize: payload.maxPartySize || undefined,
+  };
+  
+  const { data } = await api.post<any>("/api/guides", apiPayload);
+  return mapApiGuideToGuide(data);
 }
 
+/**
+ * Actualiza una guía existente (endpoint PUT /api/guides/{id})
+ */
 export async function updateGuide(id: string, payload: Partial<GuideFormData>): Promise<Guide> {
-  const { data } = await api.put<Guide>(`/api/guides/${id}`, payload);
-  return data;
+  // Mapear formato del frontend al formato del API
+  const apiPayload: any = {};
+  
+  if (payload.name !== undefined) apiPayload.fullName = payload.name;
+  if (payload.email !== undefined) apiPayload.email = payload.email;
+  if (payload.phone !== undefined) apiPayload.phone = payload.phone;
+  if (payload.isLeader !== undefined) apiPayload.isLeader = payload.isLeader;
+  if (payload.status !== undefined) apiPayload.status = payload.status === 'activo';
+  if (payload.maxPartySize !== undefined) apiPayload.maxPartySize = payload.maxPartySize;
+  
+  const { data } = await api.put<any>(`/api/guides/${id}`, apiPayload);
+  return mapApiGuideToGuide(data);
 }
 
+/**
+ * Elimina una guía (endpoint DELETE /api/guides/{id})
+ */
 export async function deleteGuide(id: string): Promise<void> {
   await api.delete(`/api/guides/${id}`);
 }

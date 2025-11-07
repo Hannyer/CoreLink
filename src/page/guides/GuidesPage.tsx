@@ -1,14 +1,34 @@
 import { useEffect, useState } from "react";
 import { TableCard, badgeStyles, type Column } from "@/components/ui/TableCard";
-import { fetchGuides, type Guide } from "@/services/guidesService";
-import { createGuide, updateGuide, deleteGuide } from "@/services/guideService";
+import { fetchGuides, createGuide, updateGuide, deleteGuide } from "@/services/guideService";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { FormInput } from "@/components/form/FormInput";
 import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useConfirm } from "@/hooks/useConfirm";
+import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus } from "lucide-react";
-import type { GuideFormData } from "@/types/entities";
+import type { Guide, GuideFormData } from "@/types/entities";
+import type { AxiosError } from "axios";
+
+/**
+ * Función helper para extraer el mensaje de error del formato del API
+ */
+function getErrorMessage(error: unknown): string {
+  const axiosError = error as AxiosError<{ message?: string; title?: string }>;
+  
+  // Intentar obtener el mensaje del formato del API
+  if (axiosError.response?.data?.message) {
+    return axiosError.response.data.message;
+  }
+  
+  // Si no hay mensaje específico, usar un mensaje genérico
+  if (axiosError.message) {
+    return axiosError.message;
+  }
+  
+  return "Ha ocurrido un error. Por favor, intenta nuevamente.";
+}
 
 export default function GuidesPage() {
   const [guides, setGuides] = useState<Guide[]>([]);
@@ -17,6 +37,7 @@ export default function GuidesPage() {
   const [editingGuide, setEditingGuide] = useState<Guide | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const { confirm, ConfirmDialogComponent } = useConfirm();
+  const toast = useToastContext();
 
   const [formData, setFormData] = useState<GuideFormData>({
     name: "",
@@ -38,6 +59,7 @@ export default function GuidesPage() {
       setGuides(data);
     } catch (error) {
       console.error("Error al cargar guías:", error);
+      toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -64,7 +86,7 @@ export default function GuidesPage() {
       phone: guide.phone || "",
       isLeader: guide.isLeader,
       maxPartySize: guide.maxPartySize ?? undefined,
-      status: guide.status ? "activo" : "inactivo",
+      status: guide.status, // Ya es 'activo' | 'inactivo'
     });
     setShowModal(true);
   };
@@ -81,10 +103,11 @@ export default function GuidesPage() {
     if (confirmed) {
       try {
         await deleteGuide(id);
+        toast.success("Guía eliminada correctamente");
         await loadGuides();
       } catch (error) {
         console.error("Error al eliminar guía:", error);
-        alert("Error al eliminar el guía. Por favor, intenta nuevamente.");
+        toast.error(getErrorMessage(error));
       }
     }
   };
@@ -93,7 +116,7 @@ export default function GuidesPage() {
     e.preventDefault();
     
     if (!formData.name.trim()) {
-      alert("El nombre es requerido");
+      toast.error("El nombre es requerido");
       return;
     }
 
@@ -109,15 +132,17 @@ export default function GuidesPage() {
 
       if (editingGuide) {
         await updateGuide(editingGuide.id, payload);
+        toast.success("Guía actualizada correctamente");
       } else {
         await createGuide(payload);
+        toast.success("Guía creada correctamente");
       }
 
       setShowModal(false);
       await loadGuides();
     } catch (error) {
       console.error("Error al guardar guía:", error);
-      alert("Error al guardar el guía. Por favor, intenta nuevamente.");
+      toast.error(getErrorMessage(error));
     } finally {
       setFormLoading(false);
     }
@@ -151,8 +176,8 @@ export default function GuidesPage() {
       width: "120px",
       align: "center",
       render: (g) => (
-        <span style={{ ...badgeStyles.base, ...(g.status ? badgeStyles.success : badgeStyles.danger) }}>
-          {g.status ? "Activo" : "Inactivo"}
+        <span style={{ ...badgeStyles.base, ...(g.status === 'activo' ? badgeStyles.success : badgeStyles.danger) }}>
+          {g.status === 'activo' ? "Activo" : "Inactivo"}
         </span>
       ),
     },

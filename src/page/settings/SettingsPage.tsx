@@ -1,46 +1,84 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import { fetchConfigurations, type Configuration } from "@/services/configurationService";
-import { ArrowUpDown } from "lucide-react";
-import ActionsCell from "@/page/commons/ActionsCell"
-type Order = "asc" | "desc";
-function SettingsPage() {
-const [items, setItems] = useState<Configuration[]>([]);
-  const [total, setTotal] = useState(0);
+import { useEffect, useState } from "react";
+import { fetchConfigurationsWithPagination, updateConfigurationValue, type Configuration } from "@/services/configurationService";
+import { Pagination } from "@/components/ui/Pagination";
+import { useToastContext } from "@/contexts/ToastContext";
+import { Check, X, Pencil } from "lucide-react";
+import type { AxiosError } from "axios";
+
+/**
+ * Función helper para extraer el mensaje de error del formato del API
+ */
+function getErrorMessage(error: unknown): string {
+  const axiosError = error as AxiosError<{ message?: string; title?: string }>;
+  
+  if (axiosError.response?.data?.message) {
+    return axiosError.response.data.message;
+  }
+  
+  if (axiosError.message) {
+    return axiosError.message;
+  }
+  
+  return "Ha ocurrido un error. Por favor, intenta nuevamente.";
+}
+
+export default function SettingsPage() {
+  const [items, setItems] = useState<Configuration[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<keyof Configuration>("pkConfiguration");
-  const [order, setOrder] = useState<Order>("desc");
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState<string>("");
+  const [savingId, setSavingId] = useState<number | null>(null);
+  const toast = useToastContext();
 
   useEffect(() => {
-    let ignore = false;
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        const data = await fetchConfigurations({ page, pageSize, search, sort, order });
-        if (!ignore) {
-          setItems(data.items);
-          setTotal(data.total);
-        }
-      } catch (e: any) {
-        if (!ignore) setErr(e?.response?.data?.message || e?.message || "Error al cargar configuración");
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    })();
-    return () => { ignore = true; };
-  }, [page, pageSize, search, sort, order]);
+    loadConfigurations();
+  }, [page, pageSize]);
 
-  const onSort = (field: keyof Configuration) => {
-    if (sort === field) setOrder(prev => (prev === "asc" ? "desc" : "asc"));
-    else { setSort(field); setOrder("asc"); }
-    setPage(1);
+  const loadConfigurations = async () => {
+    try {
+      setLoading(true);
+      setErr("");
+      const response = await fetchConfigurationsWithPagination(page, pageSize);
+      setItems(response.items);
+      setTotalPages(response.totalPages);
+      setTotal(response.total);
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || e?.message || "Error al cargar configuración");
+      toast.error(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartEdit = (config: Configuration) => {
+    setEditingId(config.pkConfiguration);
+    setEditingValue(config.value || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingValue("");
+  };
+
+  const handleSaveValue = async (id: number) => {
+    try {
+      setSavingId(id);
+      await updateConfigurationValue(id, editingValue);
+      toast.success("Valor actualizado correctamente");
+      setEditingId(null);
+      setEditingValue("");
+      await loadConfigurations();
+    } catch (error) {
+      console.error("Error al actualizar valor:", error);
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSavingId(null);
+    }
   };
 
   const estadoBadge = (estado: number | null) => {
@@ -53,20 +91,13 @@ const [items, setItems] = useState<Configuration[]>([]);
     <div className="card shadow-sm">
       <div className="card-header bg-white d-flex flex-wrap align-items-center gap-2">
         <h5 className="mb-0 me-auto">Configuración del sistema</h5>
-        <input
-          className="form-control"
-          style={{ maxWidth: 300 }}
-          placeholder="Buscar (DisplayName, Description, Keys...)"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
         <select
           className="form-select"
           style={{ width: 120 }}
           value={pageSize}
           onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
         >
-          {[5,10, 20, 50, 100].map(v => <option key={v} value={v}>{v} / pág.</option>)}
+          {[5, 10, 20, 50, 100].map(v => <option key={v} value={v}>{v} / pág.</option>)}
         </select>
       </div>
 
@@ -77,39 +108,83 @@ const [items, setItems] = useState<Configuration[]>([]);
           <table className="table align-middle mb-0">
             <thead className="table-light">
               <tr>
-                <Th sortable field="description"      sort={sort} order={order} onSort={onSort}>Descripción</Th>
-                <Th>Keys</Th>
-                <Th>Value</Th>
-                  <Th>Estado</Th>
-                <th style={{ width: 110 }} className="text-end">Acciones</th>
+                <th>Descripción</th>
+                <th>Keys</th>
+                <th>Value</th>
+                <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="text-center p-4">
+                <tr><td colSpan={4} className="text-center p-4">
                   <div className="spinner-border spinner-border-sm me-2" /> Cargando…
                 </td></tr>
-              ) : (!items  || items.length === 0) ? (
-                <tr><td colSpan={8} className="text-center p-4 text-muted">Sin resultados</td></tr>
+              ) : (!items || items.length === 0) ? (
+                <tr><td colSpan={4} className="text-center p-4 text-muted">Sin resultados</td></tr>
               ) : (
                 items.map(row => (
                   <tr key={row.pkConfiguration}>
-               
-                   
                     <td className="text-truncate" style={{ maxWidth: 360 }}>
                       {row.description ?? "—"}
                     </td>
                     <td className="small text-muted">
                       {[row.key01, row.key02, row.key03, row.key04, row.key05, row.key06].filter(Boolean).join(" · ") || "—"}
                     </td>
-                    <td className="text-truncate" style={{ maxWidth: 260 }}>
-                      {row.value ?? "—"}
+                    <td style={{ maxWidth: 300 }}>
+                      {editingId === row.pkConfiguration ? (
+                        <div className="d-flex align-items-center gap-2">
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            disabled={savingId === row.pkConfiguration}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleSaveValue(row.pkConfiguration);
+                              } else if (e.key === "Escape") {
+                                handleCancelEdit();
+                              }
+                            }}
+                          />
+                          <button
+                            className="btn btn-sm btn-success"
+                            onClick={() => handleSaveValue(row.pkConfiguration)}
+                            disabled={savingId === row.pkConfiguration}
+                            title="Guardar"
+                          >
+                            {savingId === row.pkConfiguration ? (
+                              <div className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} />
+                            ) : (
+                              <Check size={14} />
+                            )}
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={handleCancelEdit}
+                            disabled={savingId === row.pkConfiguration}
+                            title="Cancelar"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="text-truncate" style={{ maxWidth: 260 }}>
+                            {row.value ?? "—"}
+                          </span>
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => handleStartEdit(row)}
+                            title="Editar valor"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </div>
+                      )}
                     </td>
-                  <td>{estadoBadge(row.estado)}</td>
-                       <ActionsCell
-        onEdit={() => {  }}
-        onDelete={() => { }}
-      />
+                    <td>{estadoBadge(row.estado)}</td>
                   </tr>
                 ))
               )}
@@ -118,50 +193,16 @@ const [items, setItems] = useState<Configuration[]>([]);
         </div>
       </div>
 
-      <div className="card-footer bg-white d-flex flex-wrap align-items-center gap-2 justify-content-between">
-        <span className="text-muted small">
-          Página {page} de {totalPages} · {total} registros
-        </span>
-        <div className="btn-group">
-          <button className="btn btn-outline-secondary" disabled={page <= 1 || loading} onClick={() => setPage(1)}>«</button>
-          <button className="btn btn-outline-secondary" disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>‹</button>
-          <button className="btn btn-outline-secondary" disabled>{page}</button>
-          <button className="btn btn-outline-secondary" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>›</button>
-          <button className="btn btn-outline-secondary" disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
-        </div>
+      <div className="card-footer bg-white">
+        <Pagination
+          current={page}
+          total={totalPages}
+          onPageChange={setPage}
+          pageSize={pageSize}
+          showPageSizeSelector={false}
+          disabled={loading}
+        />
       </div>
     </div>
   );
 }
-
-function Th<T extends object>({
-  children,
-  sortable,
-  field,
-  sort,
-  order,
-  onSort
-}: {
-  children: React.ReactNode;
-  sortable?: boolean;
-  field?: keyof T | string;
-  sort?: keyof T | string;
-  order?: Order;
-  onSort?: (f: any) => void;
-}) {
-  const active = sortable && field === sort;
-  return (
-    <th
-      role={sortable ? "button" : undefined}
-      onClick={sortable && field && onSort ? () => onSort(field as any) : undefined}
-      className={sortable ? "user-select-none" : undefined}
-    >
-      <span className="d-inline-flex align-items-center gap-1">
-        {children}
-        {sortable && <ArrowUpDown size={16} className={active ? "text-primary" : "text-muted"} />}
-        {active && <small className="text-primary">{order === "asc" ? "↑" : "↓"}</small>}
-      </span>
-    </th>
-  );
-}
-export default SettingsPage

@@ -18,8 +18,21 @@ export async function fetchActivities(
 }
 
 export async function getAllActivities(): Promise<Activity[]> {
-  const { data } = await api.get<Activity[]>("/api/activities");
-  return data;
+  const { data } = await api.get<any>("/api/activities");
+  
+  // Manejar respuesta paginada
+  if (data.items && Array.isArray(data.items)) {
+    return data.items;
+  }
+  
+  // Manejar respuesta directa como array
+  if (Array.isArray(data)) {
+    return data;
+  }
+  
+  // Fallback: devolver array vacío si no es un formato esperado
+  console.warn("getAllActivities: respuesta inesperada del API", data);
+  return [];
 }
 
 export async function getActivity(id: string): Promise<Activity> {

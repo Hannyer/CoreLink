@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { logout } from "@/services/authService";
 import {
   CalendarCheck,
+  CalendarRange,
   ClipboardList,
   Users,
   BusFront,
@@ -181,6 +182,19 @@ export default function MainLayout() {
             <div className="sidebar-section mt-3 mb-1">
               {(!collapsed || isMobile) && <small className="text-white-50 px-3">Operación</small>}
             </div>
+            <li>
+              <NavLink
+                to="/activities"
+                className={linkCls}
+                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
+                data-bs-placement="right"
+                title={collapsed && !isMobile ? "Actividades" : undefined}
+                onClick={handleNavClick}
+              >
+                <CalendarRange size={20} />
+                {(!collapsed || isMobile) && "Actividades"}
+              </NavLink>
+            </li>
             <li>
               <NavLink
                 to="/operaciones"

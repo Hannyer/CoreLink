@@ -7,4 +7,5 @@ export * from './transportService';
 export * from './pickupPointService';
 export * from './scheduleService';
 export * from './configurationService';
+export * from './activitiesService';
 

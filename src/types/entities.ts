@@ -320,6 +320,77 @@ export interface TransportFormData {
 }
 
 // ============================================
+// ACTIVITY SCHEDULED (Actividad Programada/Evento)
+// Diferente de Activity (tipo de actividad turística)
+// ============================================
+export interface ActivityScheduled {
+  id: string;
+  activityTypeId: string;
+  activityTypeName?: string;
+  title: string;
+  partySize: number;
+  start: string; // ISO datetime
+  end: string; // ISO datetime
+  languageIds?: string[];
+  languages?: Array<{ id: string; name: string; code: string }>;
+  assignments?: ActivityAssignment[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ActivityAssignment {
+  id?: string;
+  guideId: string;
+  guideName?: string;
+  isLeader: boolean;
+  assignedAt?: string;
+}
+
+export interface ActivityListItem {
+  id: string;
+  activityTypeId: string;
+  activityTypeName?: string;
+  title: string;
+  partySize: number;
+  start: string;
+  end: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ActivityByDate extends ActivityScheduled {
+  // Incluye toda la información completa de la actividad
+}
+
+export interface ActivityCreateRequest {
+  activityTypeId: string;
+  title: string;
+  partySize: number;
+  start: string; // ISO datetime
+  end: string; // ISO datetime
+  languageIds?: string[];
+  autoAssign?: boolean; // Si true, asigna guías automáticamente
+  assignments?: ActivityAssignment[];
+}
+
+export interface ActivityCreateResponse extends ActivityScheduled {
+  // Respuesta completa de la actividad creada
+}
+
+export interface ActivityUpdateRequest {
+  activityTypeId?: string;
+  title?: string;
+  partySize?: number;
+  start?: string; // ISO datetime
+  end?: string; // ISO datetime
+  languageIds?: string[];
+}
+
+export interface AssignmentReplaceRequest {
+  assignments: ActivityAssignment[];
+}
+
+// ============================================
 // API RESPONSES
 // ============================================
 export interface PaginatedResponse<T> {

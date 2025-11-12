@@ -54,18 +54,15 @@ export interface Reservation {
 // ============================================
 export interface Activity {
   id: string;
-  name: string;
-  description?: string;
-  duration: number; // Duración en minutos
-  capacity: number; // Capacidad máxima
-  minCapacity?: number; // Capacidad mínima
-  price?: number;
-  adultPrice?: number;
-  childPrice?: number;
-  status: 'activa' | 'inactiva';
-  schedules?: Schedule[]; // Horarios disponibles
-  createdAt: string;
-  updatedAt: string;
+  activityTypeId: string;
+  title: string;
+  partySize: number;
+  status: boolean; // true = activa, false = inactiva
+  activityTypeName?: string;
+  schedulesCount?: number;
+  schedules?: ActivitySchedule[]; // Planeaciones (fechas/horarios)
+  guides?: any[]; // Guías asignados
+  languages?: any[]; // Idiomas
 }
 
 // ============================================
@@ -133,7 +130,19 @@ export interface PickupPoint {
 }
 
 // ============================================
-// SCHEDULE (Horario)
+// ACTIVITY SCHEDULE (Planeación/Fecha de Actividad)
+// ============================================
+export interface ActivitySchedule {
+  id: string;
+  activityId: string;
+  scheduledStart: string; // ISO datetime
+  scheduledEnd: string; // ISO datetime
+  status: boolean; // true = activa, false = inactiva
+  activityTitle?: string; // Para mostrar en listas
+}
+
+// ============================================
+// SCHEDULE (Horario) - Mantener para compatibilidad
 // ============================================
 export type DayOfWeek = 
   | 'lunes' 
@@ -273,15 +282,16 @@ export interface ReservationFormData {
 }
 
 export interface ActivityFormData {
-  name: string;
-  description?: string;
-  duration: number;
-  capacity: number;
-  minCapacity?: number;
-  price?: number;
-  adultPrice?: number;
-  childPrice?: number;
-  status: 'activa' | 'inactiva';
+  activityTypeId: string;
+  title: string;
+  partySize: number;
+  status?: boolean; // true = activa, false = inactiva
+}
+
+export interface ActivityScheduleFormData {
+  scheduledStart: string; // ISO datetime
+  scheduledEnd: string; // ISO datetime
+  status?: boolean; // true = activa, false = inactiva
 }
 
 export interface GuideFormData {
@@ -366,9 +376,8 @@ export interface ActivityCreateRequest {
   activityTypeId: string;
   title: string;
   partySize: number;
-  start: string; // ISO datetime
-  end: string; // ISO datetime
-  languageIds?: string[];
+  start?: string; // ISO datetime (opcional)
+  end?: string; // ISO datetime (opcional)
   autoAssign?: boolean; // Si true, asigna guías automáticamente
   assignments?: ActivityAssignment[];
 }
@@ -381,9 +390,8 @@ export interface ActivityUpdateRequest {
   activityTypeId?: string;
   title?: string;
   partySize?: number;
-  start?: string; // ISO datetime
-  end?: string; // ISO datetime
-  languageIds?: string[];
+  start?: string; // ISO datetime (opcional)
+  end?: string; // ISO datetime (opcional)
 }
 
 export interface AssignmentReplaceRequest {

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { TableCard, type Column } from "@/components/ui/TableCard";
+import { TableCard, badgeStyles, type Column } from "@/components/ui/TableCard";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FormInput } from "@/components/form/FormInput";
 import { type SelectOption } from "@/components/form/FormSelect";
 import { FormCombobox } from "@/components/form/FormCombobox";
+import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useToastContext } from "@/contexts/ToastContext";
 import { useConfirm } from "@/hooks/useConfirm";
 import {
@@ -32,12 +33,14 @@ type ActivityFormState = {
   activityTypeId: string;
   title: string;
   partySize: number;
+  status: boolean;
 };
 
 const DEFAULT_FORM_STATE: ActivityFormState = {
   activityTypeId: "",
   title: "",
   partySize: 1,
+  status: true,
 };
 
 
@@ -48,6 +51,7 @@ function mapByDateToRow(item: ActivityByDate): ActivityRow {
     activityTypeName: item.activityTypeName,
     title: item.title,
     partySize: item.partySize,
+    status: item.status,
     start: item.start,
     end: item.end,
     createdAt: item.createdAt,
@@ -183,6 +187,7 @@ export default function ActivitiesPage() {
         activityTypeId: data.activityTypeId,
         title: data.title,
         partySize: data.partySize,
+        status: data.status ?? true,
       });
     } catch (err) {
       console.error("Error al obtener actividad:", err);
@@ -252,6 +257,7 @@ export default function ActivitiesPage() {
           activityTypeId: formState.activityTypeId,
           title: formState.title.trim(),
           partySize: formState.partySize,
+          status: formState.status,
         };
 
         await updateScheduledActivity(currentActivityId, updatePayload);
@@ -261,6 +267,7 @@ export default function ActivitiesPage() {
           activityTypeId: formState.activityTypeId,
           title: formState.title.trim(),
           partySize: formState.partySize,
+          status: formState.status,
         };
 
         await createScheduledActivity(createPayload);
@@ -295,6 +302,22 @@ export default function ActivitiesPage() {
       width: "120px",
       align: "center",
       accessor: (row) => row.partySize,
+    },
+    {
+      key: "status",
+      header: "Estado",
+      width: "120px",
+      align: "center",
+      render: (row) => (
+        <span
+          style={{
+            ...badgeStyles.base,
+            ...(row.status ? badgeStyles.success : badgeStyles.danger),
+          }}
+        >
+          {row.status ? "Activa" : "Inactiva"}
+        </span>
+      ),
     },
     {
       key: "actions",
@@ -436,6 +459,13 @@ export default function ActivitiesPage() {
                 required
                 disabled={formLoading}
                 fullWidth
+              />
+
+              <FormCheckbox
+                label="Activa"
+                checked={formState.status ?? true}
+                onChange={(e) => setFormState((prev) => ({ ...prev, status: e.target.checked }))}
+                disabled={formLoading}
               />
             </div>
 

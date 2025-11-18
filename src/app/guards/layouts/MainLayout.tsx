@@ -15,7 +15,9 @@ import {
   FilePlus2,
   Menu,
   Search,
-  X
+  X,
+  CalendarClock,
+  Building2
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -154,7 +156,7 @@ export default function MainLayout() {
             </div>
             <li>
               <NavLink
-                to="/reservas"
+                to="/bookings"
                 className={linkCls}
                 data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
                 data-bs-placement="right"
@@ -163,19 +165,6 @@ export default function MainLayout() {
               >
                 <ClipboardList size={20} />
                 {(!collapsed || isMobile) && "Reservas"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/reservas/nueva"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Nueva reserva" : undefined}
-                onClick={handleNavClick}
-              >
-                <FilePlus2 size={20} />
-                {(!collapsed || isMobile) && "Nueva reserva"}
               </NavLink>
             </li>
 
@@ -193,6 +182,19 @@ export default function MainLayout() {
               >
                 <CalendarRange size={20} />
                 {(!collapsed || isMobile) && "Actividades"}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/schedules"
+                className={linkCls}
+                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
+                data-bs-placement="right"
+                title={collapsed && !isMobile ? "Planeaciones" : undefined}
+                onClick={handleNavClick}
+              >
+                <CalendarClock size={20} />
+                {(!collapsed || isMobile) && "Planeaciones"}
               </NavLink>
             </li>
             <li>
@@ -251,6 +253,19 @@ export default function MainLayout() {
             <div className="sidebar-section mt-3 mb-1">
               {(!collapsed || isMobile) && <small className="text-white-50 px-3">Gestión</small>}
             </div>
+            <li>
+              <NavLink
+                to="/companies"
+                className={linkCls}
+                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
+                data-bs-placement="right"
+                title={collapsed && !isMobile ? "Compañías" : undefined}
+                onClick={handleNavClick}
+              >
+                <Building2 size={20} />
+                {(!collapsed || isMobile) && "Compañías"}
+              </NavLink>
+            </li>
             <li>
               <NavLink
                 to="/clientes"
@@ -332,7 +347,7 @@ export default function MainLayout() {
 
           <div className="d-flex align-items-center gap-2">
             <NavLink 
-              to="/reservas/nueva" 
+              to="/bookings" 
               className={`btn btn-success d-flex align-items-center gap-2 ${isMobile ? 'btn-sm' : ''}`}
             >
               {isMobile ? (

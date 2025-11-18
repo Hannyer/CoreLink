@@ -1,0 +1,834 @@
+import { useEffect, useState, useMemo } from "react";
+import { TableCard, badgeStyles, type Column } from "@/components/ui/TableCard";
+import {
+  fetchBookingsWithPagination,
+  getAvailableSchedulesByActivityId,
+  checkAvailability,
+  createBooking,
+  updateBooking,
+  cancelBooking,
+  getBookingById,
+} from "@/services/bookingsService";
+import { fetchActivitiesWithPagination } from "@/services/activityService";
+import { fetchCompaniesWithPagination } from "@/services/companiesService";
+import { fetchAvailableTransportsWithPagination } from "@/services/transportService";
+import { Pagination } from "@/components/ui/Pagination";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { FormInput } from "@/components/form/FormInput";
+import { FormCombobox, type SelectOption } from "@/components/form/FormCombobox";
+import { FormCheckbox } from "@/components/form/FormCheckbox";
+import { useConfirm } from "@/hooks/useConfirm";
+import { useToastContext } from "@/contexts/ToastContext";
+import { Edit, Trash2, Plus, X } from "lucide-react";
+import type {
+  Booking,
+  BookingFormData,
+  BookingStatus,
+  Activity,
+  Company,
+  Transport,
+  AvailableSchedule,
+  AvailabilityInfo,
+} from "@/types/entities";
+import type { AxiosError } from "axios";
+
+/**
+ * Función helper para extraer el mensaje de error del formato del API
+ */
+function getErrorMessage(error: unknown): string {
+  const axiosError = error as AxiosError<{ message?: string; title?: string }>;
+
+  if (axiosError.response?.data?.message) {
+    return axiosError.response.data.message;
+  }
+
+  if (axiosError.message) {
+    return axiosError.message;
+  }
+
+  return "Ha ocurrido un error. Por favor, intenta nuevamente.";
+}
+
+export default function BookingsPage() {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const { confirm, ConfirmDialogComponent } = useConfirm();
+  const toast = useToastContext();
+
+  // Estado de paginación
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<BookingStatus | null>(null);
+
+  // Estados para el formulario
+  const [selectedActivityId, setSelectedActivityId] = useState<string>("");
+  const [availableSchedules, setAvailableSchedules] = useState<AvailableSchedule[]>([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
+  const [availabilityInfo, setAvailabilityInfo] = useState<AvailabilityInfo | null>(null);
+  const [needsTransport, setNeedsTransport] = useState(false);
+
+  // Catálogos
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [transports, setTransports] = useState<Transport[]>([]);
+  const [catalogsLoading, setCatalogsLoading] = useState(false);
+
+  const [formData, setFormData] = useState<BookingFormData>({
+    activityScheduleId: "",
+    companyId: null,
+    transportId: null,
+    numberOfPeople: 1,
+    commissionPercentage: undefined,
+    customerName: "",
+    customerEmail: null,
+    customerPhone: null,
+    status: "pending",
+  });
+
+  const dateTimeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("es-ES", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    []
+  );
+
+  const activityOptions: SelectOption[] = useMemo(
+    () =>
+      activities
+        .filter((a) => a.status)
+        .map((activity) => ({
+          value: activity.id,
+          label: activity.title || activity.activityTypeName || "Sin título",
+        })),
+    [activities]
+  );
+
+  const companyOptions: SelectOption[] = useMemo(
+    () =>
+      companies
+        .filter((c) => c.status)
+        .map((company) => ({
+          value: company.id,
+          label: `${company.name} (${company.commissionPercentage}%)`,
+        })),
+    [companies]
+  );
+
+  const transportOptions: SelectOption[] = useMemo(
+    () =>
+      transports
+        .filter((t) => t.status && t.operationalStatus)
+        .map((transport) => ({
+          value: transport.id,
+          label: `${transport.model} (Cap: ${transport.capacity})`,
+        })),
+    [transports]
+  );
+
+  const scheduleOptions: SelectOption[] = useMemo(
+    () =>
+      availableSchedules
+        .filter((s) => s.status && s.availableSpaces > 0)
+        .map((schedule) => ({
+          value: schedule.id,
+          label: `${dateTimeFormatter.format(new Date(schedule.scheduledStart))} - ${dateTimeFormatter.format(new Date(schedule.scheduledEnd))} (Disponibles: ${schedule.availableSpaces})`,
+        })),
+    [availableSchedules, dateTimeFormatter]
+  );
+
+  useEffect(() => {
+    loadCatalogs();
+  }, []);
+
+  useEffect(() => {
+    loadBookings();
+  }, [page, pageSize, statusFilter]);
+
+  useEffect(() => {
+    if (selectedActivityId) {
+      loadAvailableSchedules();
+    } else {
+      setAvailableSchedules([]);
+      setSelectedScheduleId("");
+      setAvailabilityInfo(null);
+    }
+  }, [selectedActivityId]);
+
+  useEffect(() => {
+    if (selectedScheduleId) {
+      loadAvailability();
+    } else {
+      setAvailabilityInfo(null);
+    }
+  }, [selectedScheduleId]);
+
+  useEffect(() => {
+    if (formData.companyId && !formData.commissionPercentage) {
+      const company = companies.find((c) => c.id === formData.companyId);
+      if (company) {
+        setFormData((prev) => ({
+          ...prev,
+          commissionPercentage: company.commissionPercentage,
+        }));
+      }
+    }
+  }, [formData.companyId, companies]);
+
+  const loadCatalogs = async () => {
+    try {
+      setCatalogsLoading(true);
+      const [activitiesRes, companiesRes, transportsRes] = await Promise.all([
+        fetchActivitiesWithPagination(1, 100, true),
+        fetchCompaniesWithPagination(1, 100, true),
+        fetchAvailableTransportsWithPagination(1, 100),
+      ]);
+      setActivities(activitiesRes.items);
+      setCompanies(companiesRes.items);
+      setTransports(transportsRes.items);
+    } catch (error) {
+      console.error("Error al cargar catálogos:", error);
+      toast.error(getErrorMessage(error));
+    } finally {
+      setCatalogsLoading(false);
+    }
+  };
+
+  const loadBookings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetchBookingsWithPagination(page, pageSize, {
+        status: statusFilter || undefined,
+      });
+      setBookings(response.items);
+      setTotalPages(response.totalPages);
+      setTotal(response.total);
+    } catch (error) {
+      console.error("Error al cargar reservas:", error);
+      toast.error(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAvailableSchedules = async () => {
+    if (!selectedActivityId) return;
+
+    try {
+      const schedules = await getAvailableSchedulesByActivityId(selectedActivityId);
+      setAvailableSchedules(schedules);
+      if (schedules.length > 0 && !selectedScheduleId) {
+        // Auto-seleccionar la primera fecha disponible si hay
+        setSelectedScheduleId(schedules[0].id);
+      }
+    } catch (error) {
+      console.error("Error al cargar fechas disponibles:", error);
+      toast.error(getErrorMessage(error));
+      setAvailableSchedules([]);
+    }
+  };
+
+  const loadAvailability = async () => {
+    if (!selectedScheduleId) return;
+
+    try {
+      const availability = await checkAvailability(selectedScheduleId);
+      setAvailabilityInfo(availability);
+      setFormData((prev) => ({
+        ...prev,
+        activityScheduleId: selectedScheduleId,
+      }));
+    } catch (error) {
+      console.error("Error al validar disponibilidad:", error);
+      toast.error(getErrorMessage(error));
+      setAvailabilityInfo(null);
+    }
+  };
+
+  const handleCreateBooking = () => {
+    setEditingBooking(null);
+    setSelectedActivityId("");
+    setSelectedScheduleId("");
+    setAvailabilityInfo(null);
+    setNeedsTransport(false);
+    setFormData({
+      activityScheduleId: "",
+      companyId: null,
+      transportId: null,
+      numberOfPeople: 1,
+      commissionPercentage: undefined,
+      customerName: "",
+      customerEmail: null,
+      customerPhone: null,
+      status: "pending",
+    });
+    setShowBookingModal(true);
+  };
+
+  const handleEditBooking = async (id: string) => {
+    try {
+      setFormLoading(true);
+      const booking = await getBookingById(id);
+      setEditingBooking(booking);
+      setSelectedActivityId(booking.activityId || "");
+      setSelectedScheduleId(booking.activityScheduleId);
+      setNeedsTransport(!!booking.transportId);
+      setFormData({
+        activityScheduleId: booking.activityScheduleId,
+        companyId: booking.companyId || null,
+        transportId: booking.transportId || null,
+        numberOfPeople: booking.numberOfPeople,
+        commissionPercentage: booking.commissionPercentage,
+        customerName: booking.customerName,
+        customerEmail: booking.customerEmail || null,
+        customerPhone: booking.customerPhone || null,
+        status: booking.status,
+      });
+      setShowBookingModal(true);
+    } catch (error) {
+      console.error("Error al cargar reserva:", error);
+      toast.error(getErrorMessage(error));
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCancelBooking = async (id: string) => {
+    const confirmed = await confirm({
+      title: "Cancelar Reserva",
+      message: "¿Estás seguro de que deseas cancelar esta reserva?",
+      variant: "danger",
+      confirmText: "Cancelar Reserva",
+      cancelText: "No",
+    });
+
+    if (confirmed) {
+      try {
+        await cancelBooking(id);
+        toast.success("Reserva cancelada correctamente");
+        await loadBookings();
+      } catch (error) {
+        console.error("Error al cancelar reserva:", error);
+        toast.error(getErrorMessage(error));
+      }
+    }
+  };
+
+  const handleSubmitBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.activityScheduleId) {
+      toast.error("Debes seleccionar una fecha");
+      return;
+    }
+
+    if (!formData.customerName.trim()) {
+      toast.error("El nombre del cliente es requerido");
+      return;
+    }
+
+    if (formData.numberOfPeople <= 0) {
+      toast.error("La cantidad de personas debe ser mayor a 0");
+      return;
+    }
+
+    if (availabilityInfo && formData.numberOfPeople > availabilityInfo.availableSpaces) {
+      toast.error(`No hay suficientes espacios disponibles. Disponibles: ${availabilityInfo.availableSpaces}`);
+      return;
+    }
+
+    // Validar comisión: debe estar definida (ya sea de compañía o manual)
+    const finalCommission =
+      formData.commissionPercentage !== undefined
+        ? formData.commissionPercentage
+        : formData.companyId
+        ? companies.find((c) => c.id === formData.companyId)?.commissionPercentage
+        : undefined;
+
+    if (finalCommission === undefined) {
+      toast.error("Debes ingresar un porcentaje de comisión o seleccionar una compañía");
+      return;
+    }
+
+    if (finalCommission < 0 || finalCommission > 100) {
+      toast.error("El porcentaje de comisión debe estar entre 0 y 100");
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+
+      const payload: BookingFormData = {
+        ...formData,
+        transportId: needsTransport ? formData.transportId : null,
+        commissionPercentage: finalCommission,
+      };
+
+      if (editingBooking) {
+        await updateBooking(editingBooking.id, payload);
+        toast.success("Reserva actualizada correctamente");
+      } else {
+        await createBooking(payload);
+        toast.success("Reserva creada correctamente");
+      }
+
+      setShowBookingModal(false);
+      await loadBookings();
+    } catch (error) {
+      console.error("Error al guardar reserva:", error);
+      toast.error(getErrorMessage(error));
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: BookingStatus) => {
+    const statusConfig = {
+      pending: { label: "Pendiente", style: badgeStyles.warn },
+      confirmed: { label: "Confirmada", style: badgeStyles.success },
+      cancelled: { label: "Cancelada", style: badgeStyles.danger },
+    };
+    const config = statusConfig[status] || statusConfig.pending;
+    return (
+      <span style={{ ...badgeStyles.base, ...config.style }}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const columns: Column<Booking>[] = [
+    {
+      key: "customerName",
+      header: "Cliente",
+      accessor: (b) => b.customerName,
+    },
+    {
+      key: "activityTitle",
+      header: "Actividad",
+      accessor: (b) => b.activityTitle || "-",
+    },
+    {
+      key: "scheduledStart",
+      header: "Fecha/Hora",
+      width: "200px",
+      render: (b) =>
+        b.scheduledStart ? (
+          <span>{dateTimeFormatter.format(new Date(b.scheduledStart))}</span>
+        ) : (
+          "-"
+        ),
+    },
+    {
+      key: "numberOfPeople",
+      header: "Personas",
+      width: "100px",
+      align: "center",
+      accessor: (b) => b.numberOfPeople,
+    },
+    {
+      key: "companyName",
+      header: "Compañía",
+      accessor: (b) => b.companyName || "-",
+    },
+    {
+      key: "commissionPercentage",
+      header: "Comisión (%)",
+      width: "120px",
+      align: "center",
+      accessor: (b) => `${b.commissionPercentage}%`,
+    },
+    {
+      key: "status",
+      header: "Estado",
+      width: "120px",
+      align: "center",
+      render: (b) => getStatusBadge(b.status),
+    },
+    {
+      key: "actions",
+      header: "Acciones",
+      width: "180px",
+      align: "center",
+      render: (b) => (
+        <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleEditBooking(b.id)}
+            icon={<Edit size={16} />}
+            style={{ padding: "4px 8px" }}
+          >
+            Editar
+          </Button>
+          {b.status !== "cancelled" && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleCancelBooking(b.id)}
+              icon={<X size={16} />}
+              style={{ padding: "4px 8px" }}
+            >
+              Cancelar
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const headerExtra = (
+    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <Button
+          variant={statusFilter === null ? "primary" : "outline"}
+          size="sm"
+          onClick={() => {
+            setStatusFilter(null);
+            setPage(1);
+          }}
+        >
+          Todas
+        </Button>
+        <Button
+          variant={statusFilter === "pending" ? "primary" : "outline"}
+          size="sm"
+          onClick={() => {
+            setStatusFilter("pending");
+            setPage(1);
+          }}
+        >
+          Pendientes
+        </Button>
+        <Button
+          variant={statusFilter === "confirmed" ? "primary" : "outline"}
+          size="sm"
+          onClick={() => {
+            setStatusFilter("confirmed");
+            setPage(1);
+          }}
+        >
+          Confirmadas
+        </Button>
+        <Button
+          variant={statusFilter === "cancelled" ? "primary" : "outline"}
+          size="sm"
+          onClick={() => {
+            setStatusFilter("cancelled");
+            setPage(1);
+          }}
+        >
+          Canceladas
+        </Button>
+      </div>
+      <Button onClick={handleCreateBooking} icon={<Plus size={18} />} size="sm">
+        Nueva reserva
+      </Button>
+    </div>
+  );
+
+  return (
+    <>
+      <TableCard<Booking>
+        title="Reservas de Actividades"
+        loading={loading}
+        data={bookings}
+        columns={columns}
+        rowKey={(b) => b.id}
+        emptyText="No hay reservas aún"
+        headerExtra={headerExtra}
+        footer={
+          <Pagination
+            current={page}
+            total={totalPages}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            showPageSizeSelector={true}
+            pageSizeOptions={[5, 10, 20, 50]}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            disabled={loading}
+          />
+        }
+      />
+
+      {/* Modal para crear/editar reserva */}
+      <Modal
+        isOpen={showBookingModal}
+        onClose={() => !formLoading && setShowBookingModal(false)}
+        title={editingBooking ? "Editar Reserva" : "Nueva Reserva"}
+        size="lg"
+        closeOnBackdropClick={!formLoading}
+        showCloseButton={!formLoading}
+      >
+        {formLoading && !editingBooking ? (
+          <div style={{ padding: "32px", textAlign: "center" }}>
+            <div className="spinner-border spinner-border-sm me-2" />
+            Cargando información…
+          </div>
+        ) : (
+          <form onSubmit={handleSubmitBooking}>
+            <div style={{ display: "grid", gap: "16px" }}>
+              {/* Paso 1: Seleccionar Actividad */}
+              <FormCombobox
+                label="Actividad"
+                value={selectedActivityId}
+                onChange={(value) => {
+                  setSelectedActivityId(String(value));
+                  setSelectedScheduleId("");
+                  setAvailabilityInfo(null);
+                  setFormData((prev) => ({
+                    ...prev,
+                    activityScheduleId: "",
+                  }));
+                }}
+                options={activityOptions}
+                placeholder={catalogsLoading ? "Cargando..." : "Selecciona una actividad"}
+                searchPlaceholder="Buscar actividad..."
+                required
+                fullWidth
+                disabled={catalogsLoading || formLoading || !!editingBooking}
+              />
+
+              {/* Paso 2: Seleccionar Fecha (solo si hay actividad seleccionada) */}
+              {selectedActivityId && (
+                <FormCombobox
+                  label="Fecha y Hora Disponible"
+                  value={selectedScheduleId}
+                  onChange={(value) => {
+                    setSelectedScheduleId(String(value));
+                  }}
+                  options={scheduleOptions}
+                  placeholder={
+                    availableSchedules.length === 0
+                      ? "Cargando fechas..."
+                      : "Selecciona una fecha"
+                  }
+                  searchPlaceholder="Buscar fecha..."
+                  required
+                  fullWidth
+                  disabled={formLoading || availableSchedules.length === 0}
+                />
+              )}
+
+              {/* Información de disponibilidad */}
+              {availabilityInfo && (
+                <div
+                  style={{
+                    padding: "12px",
+                    backgroundColor: "#f8fafc",
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span style={{ fontWeight: 600 }}>Disponibilidad:</span>
+                    <span
+                      style={{
+                        ...badgeStyles.base,
+                        ...(availabilityInfo.availableSpaces > 0
+                          ? badgeStyles.success
+                          : badgeStyles.danger),
+                      }}
+                    >
+                      {availabilityInfo.availableSpaces} espacios disponibles
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.875rem", color: "#64748b" }}>
+                    Capacidad total: {availabilityInfo.partySize} | Reservados:{" "}
+                    {availabilityInfo.bookedPeople}
+                  </div>
+                </div>
+              )}
+
+              {/* Paso 3: Cantidad de Personas */}
+              <FormInput
+                label="Cantidad de Personas"
+                type="number"
+                min={1}
+                max={availabilityInfo?.availableSpaces || undefined}
+                value={formData.numberOfPeople || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    numberOfPeople: e.target.value ? parseInt(e.target.value, 10) : 1,
+                  })
+                }
+                required
+                fullWidth
+                disabled={formLoading || !availabilityInfo}
+                helperText={
+                  availabilityInfo
+                    ? `Máximo ${availabilityInfo.availableSpaces} espacios disponibles`
+                    : "Selecciona una fecha primero"
+                }
+              />
+
+              {/* Paso 4: Datos del Cliente */}
+              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
+                <h4 style={{ marginBottom: "16px", fontSize: "1rem", fontWeight: 600 }}>
+                  Datos del Cliente
+                </h4>
+                <FormInput
+                  label="Nombre del Cliente"
+                  value={formData.customerName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, customerName: e.target.value })
+                  }
+                  required
+                  fullWidth
+                  disabled={formLoading}
+                />
+                <FormInput
+                  label="Email (opcional)"
+                  type="email"
+                  value={formData.customerEmail || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      customerEmail: e.target.value || null,
+                    })
+                  }
+                  fullWidth
+                  disabled={formLoading}
+                />
+                <FormInput
+                  label="Teléfono (opcional)"
+                  value={formData.customerPhone || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      customerPhone: e.target.value || null,
+                    })
+                  }
+                  fullWidth
+                  disabled={formLoading}
+                />
+              </div>
+
+              {/* Paso 5: Transporte */}
+              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
+                <FormCheckbox
+                  label="Requiere Transporte"
+                  checked={needsTransport}
+                  onChange={(e) => {
+                    setNeedsTransport(e.target.checked);
+                    if (!e.target.checked) {
+                      setFormData({ ...formData, transportId: null });
+                    }
+                  }}
+                  disabled={formLoading}
+                />
+                {needsTransport && (
+                  <FormCombobox
+                    label="Transporte"
+                    value={formData.transportId || ""}
+                    onChange={(value) =>
+                      setFormData({ ...formData, transportId: String(value) || null })
+                    }
+                    options={transportOptions}
+                    placeholder="Selecciona un transporte"
+                    searchPlaceholder="Buscar transporte..."
+                    fullWidth
+                    disabled={formLoading || transportOptions.length === 0}
+                  />
+                )}
+              </div>
+
+              {/* Paso 6: Comisión */}
+              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
+                <h4 style={{ marginBottom: "16px", fontSize: "1rem", fontWeight: 600 }}>
+                  Comisión
+                </h4>
+                <FormCombobox
+                  label="Compañía (opcional)"
+                  value={formData.companyId || ""}
+                  onChange={(value) => {
+                    const companyId = value ? String(value) : null;
+                    setFormData({
+                      ...formData,
+                      companyId,
+                      commissionPercentage: companyId
+                        ? companies.find((c) => c.id === companyId)?.commissionPercentage
+                        : undefined,
+                    });
+                  }}
+                  options={companyOptions}
+                  placeholder="Selecciona una compañía (opcional)"
+                  searchPlaceholder="Buscar compañía..."
+                  fullWidth
+                  disabled={formLoading}
+                />
+                <FormInput
+                  label="Porcentaje de Comisión (%)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={
+                    formData.commissionPercentage !== undefined
+                      ? formData.commissionPercentage
+                      : formData.companyId
+                      ? companies.find((c) => c.id === formData.companyId)?.commissionPercentage || ""
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                    setFormData({
+                      ...formData,
+                      commissionPercentage: value,
+                    });
+                  }}
+                  fullWidth
+                  disabled={formLoading}
+                  placeholder={
+                    formData.companyId
+                      ? `Usará ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}% de la compañía`
+                      : "Ingresa manualmente o selecciona una compañía"
+                  }
+                  helperText={
+                    formData.companyId
+                      ? "Puedes sobrescribir el porcentaje de la compañía ingresando un valor manual"
+                      : "Si no seleccionas una compañía, ingresa el porcentaje manualmente"
+                  }
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-end",
+                marginTop: "24px",
+              }}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowBookingModal(false)}
+                disabled={formLoading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" loading={formLoading}>
+                {editingBooking ? "Guardar Cambios" : "Crear Reserva"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <ConfirmDialogComponent />
+    </>
+  );
+}
+

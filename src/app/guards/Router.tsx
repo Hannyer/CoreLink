@@ -10,6 +10,9 @@ import SettingsPage from "@/page/settings/SettingsPage";
 import GuidesPage from "@/page/guides/GuidesPage";
 import TransportsPage from "@/page/transports/TransportsPage";
 import ActivitiesPage from "@/page/activities/ActivitiesPage";
+import SchedulesPage from "@/page/schedules/SchedulesPage";
+import CompaniesPage from "@/page/companies/CompaniesPage";
+import BookingsPage from "@/page/bookings/BookingsPage";
 
 const router = createBrowserRouter([
   // Público
@@ -28,6 +31,9 @@ const router = createBrowserRouter([
       { path: "/about", element: <AboutPage /> },
       { path: "/guides", element: <GuidesPage /> },
       { path: "/activities", element: <ActivitiesPage /> },
+      { path: "/schedules", element: <SchedulesPage /> },
+      { path: "/companies", element: <CompaniesPage /> },
+      { path: "/bookings", element: <BookingsPage /> },
       { path: "/transports", element: <TransportsPage /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "/dashboard", element: <h1>Zona Privada</h1> },

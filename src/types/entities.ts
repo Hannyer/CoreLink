@@ -339,6 +339,7 @@ export interface ActivityScheduled {
   activityTypeName?: string;
   title: string;
   partySize: number;
+  status?: boolean;
   start: string; // ISO datetime
   end: string; // ISO datetime
   languageIds?: string[];
@@ -362,6 +363,7 @@ export interface ActivityListItem {
   activityTypeName?: string;
   title: string;
   partySize: number;
+  status?: boolean;
   start: string;
   end: string;
   createdAt?: string;
@@ -376,6 +378,7 @@ export interface ActivityCreateRequest {
   activityTypeId: string;
   title: string;
   partySize: number;
+  status?: boolean;
   start?: string; // ISO datetime (opcional)
   end?: string; // ISO datetime (opcional)
   autoAssign?: boolean; // Si true, asigna guías automáticamente
@@ -390,6 +393,7 @@ export interface ActivityUpdateRequest {
   activityTypeId?: string;
   title?: string;
   partySize?: number;
+  status?: boolean;
   start?: string; // ISO datetime (opcional)
   end?: string; // ISO datetime (opcional)
 }
@@ -413,5 +417,90 @@ export interface ApiError {
   message: string;
   code?: string;
   details?: Record<string, any>;
+}
+
+// ============================================
+// COMPANY (Compañía/Socio)
+// ============================================
+export interface Company {
+  id: string;
+  name: string;
+  commissionPercentage: number; // Porcentaje de comisión (0-100)
+  status: boolean; // true = activa, false = inactiva
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyFormData {
+  name: string;
+  commissionPercentage: number;
+  status?: boolean;
+}
+
+export interface CompanyFilters {
+  status?: boolean;
+}
+
+// ============================================
+// BOOKING (Reserva - Recepcionista)
+// ============================================
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface Booking {
+  id: string;
+  activityScheduleId: string;
+  companyId?: string | null;
+  transportId?: string | null;
+  numberOfPeople: number;
+  commissionPercentage: number;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  status: BookingStatus;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  // Campos adicionales para mostrar en listas
+  activityTitle?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  companyName?: string | null;
+  transportModel?: string | null;
+  activityId?: string;
+  activityPartySize?: number;
+  companyCommissionPercentage?: number | null;
+  transportCapacity?: number | null;
+}
+
+export interface BookingFormData {
+  activityScheduleId: string;
+  companyId?: string | null;
+  transportId?: string | null;
+  numberOfPeople: number;
+  commissionPercentage?: number;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  status?: BookingStatus;
+}
+
+export interface AvailableSchedule extends ActivitySchedule {
+  partySize: number;
+  bookedPeople: number;
+  availableSpaces: number;
+}
+
+export interface AvailabilityInfo {
+  scheduleId: string;
+  activityId: string;
+  activityTitle: string;
+  partySize: number;
+  bookedPeople: number;
+  availableSpaces: number;
+}
+
+export interface BookingFilters {
+  status?: BookingStatus;
+  activityScheduleId?: string;
 }
 

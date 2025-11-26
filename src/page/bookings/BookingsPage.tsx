@@ -11,7 +11,6 @@ import {
 } from "@/services/bookingsService";
 import { fetchActivitiesWithPagination } from "@/services/activityService";
 import { fetchCompaniesWithPagination } from "@/services/companiesService";
-import { fetchAvailableTransportsWithPagination } from "@/services/transportService";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -27,7 +26,6 @@ import type {
   BookingStatus,
   Activity,
   Company,
-  Transport,
   AvailableSchedule,
   AvailabilityInfo,
 } from "@/types/entities";
@@ -71,19 +69,18 @@ export default function BookingsPage() {
   const [availableSchedules, setAvailableSchedules] = useState<AvailableSchedule[]>([]);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [availabilityInfo, setAvailabilityInfo] = useState<AvailabilityInfo | null>(null);
-  const [needsTransport, setNeedsTransport] = useState(false);
 
   // Catálogos
   const [activities, setActivities] = useState<Activity[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [transports, setTransports] = useState<Transport[]>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(false);
 
   const [formData, setFormData] = useState<BookingFormData>({
     activityScheduleId: "",
     companyId: null,
-    transportId: null,
+    transport: false,
     numberOfPeople: 1,
+    passengerCount: null,
     commissionPercentage: undefined,
     customerName: "",
     customerEmail: null,
@@ -122,21 +119,10 @@ export default function BookingsPage() {
     [companies]
   );
 
-  const transportOptions: SelectOption[] = useMemo(
-    () =>
-      transports
-        .filter((t) => t.status && t.operationalStatus)
-        .map((transport) => ({
-          value: transport.id,
-          label: `${transport.model} (Cap: ${transport.capacity})`,
-        })),
-    [transports]
-  );
-
   const scheduleOptions: SelectOption[] = useMemo(
     () =>
       availableSchedules
-        .filter((s) => s.status && s.availableSpaces > 0)
+        .filter((s) => s.status === true) // Mostrar todas las fechas activas
         .map((schedule) => ({
           value: schedule.id,
           label: `${dateTimeFormatter.format(new Date(schedule.scheduledStart))} - ${dateTimeFormatter.format(new Date(schedule.scheduledEnd))} (Disponibles: ${schedule.availableSpaces})`,
@@ -185,14 +171,12 @@ export default function BookingsPage() {
   const loadCatalogs = async () => {
     try {
       setCatalogsLoading(true);
-      const [activitiesRes, companiesRes, transportsRes] = await Promise.all([
+      const [activitiesRes, companiesRes] = await Promise.all([
         fetchActivitiesWithPagination(1, 100, true),
         fetchCompaniesWithPagination(1, 100, true),
-        fetchAvailableTransportsWithPagination(1, 100),
       ]);
       setActivities(activitiesRes.items);
       setCompanies(companiesRes.items);
-      setTransports(transportsRes.items);
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
       toast.error(getErrorMessage(error));
@@ -219,14 +203,17 @@ export default function BookingsPage() {
   };
 
   const loadAvailableSchedules = async () => {
-    if (!selectedActivityId) return;
+    if (!selectedActivityId) {
+      setAvailableSchedules([]);
+      return;
+    }
 
     try {
+      setAvailableSchedules([]);
       const schedules = await getAvailableSchedulesByActivityId(selectedActivityId);
       setAvailableSchedules(schedules);
-      if (schedules.length > 0 && !selectedScheduleId) {
-        // Auto-seleccionar la primera fecha disponible si hay
-        setSelectedScheduleId(schedules[0].id);
+      if (schedules.length === 0) {
+        toast.info("No hay fechas disponibles para esta actividad");
       }
     } catch (error) {
       console.error("Error al cargar fechas disponibles:", error);
@@ -257,12 +244,12 @@ export default function BookingsPage() {
     setSelectedActivityId("");
     setSelectedScheduleId("");
     setAvailabilityInfo(null);
-    setNeedsTransport(false);
     setFormData({
       activityScheduleId: "",
       companyId: null,
-      transportId: null,
+      transport: false,
       numberOfPeople: 1,
+      passengerCount: null,
       commissionPercentage: undefined,
       customerName: "",
       customerEmail: null,
@@ -279,12 +266,12 @@ export default function BookingsPage() {
       setEditingBooking(booking);
       setSelectedActivityId(booking.activityId || "");
       setSelectedScheduleId(booking.activityScheduleId);
-      setNeedsTransport(!!booking.transportId);
       setFormData({
         activityScheduleId: booking.activityScheduleId,
         companyId: booking.companyId || null,
-        transportId: booking.transportId || null,
+        transport: booking.transport,
         numberOfPeople: booking.numberOfPeople,
+        passengerCount: booking.passengerCount || null,
         commissionPercentage: booking.commissionPercentage,
         customerName: booking.customerName,
         customerEmail: booking.customerEmail || null,
@@ -334,6 +321,16 @@ export default function BookingsPage() {
       return;
     }
 
+    if (!formData.customerEmail || !formData.customerEmail.trim()) {
+      toast.error("El email del cliente es requerido");
+      return;
+    }
+
+    if (!formData.customerPhone || !formData.customerPhone.trim()) {
+      toast.error("El teléfono del cliente es requerido");
+      return;
+    }
+
     if (formData.numberOfPeople <= 0) {
       toast.error("La cantidad de personas debe ser mayor a 0");
       return;
@@ -344,16 +341,34 @@ export default function BookingsPage() {
       return;
     }
 
-    // Validar comisión: debe estar definida (ya sea de compañía o manual)
+    // Validar transporte y pasajeros
+    if (formData.transport) {
+      if (formData.passengerCount === null || formData.passengerCount === undefined) {
+        toast.error("La cantidad de pasajeros para transporte es requerida");
+        return;
+      }
+      if (formData.passengerCount < 1) {
+        toast.error("La cantidad de pasajeros para transporte debe ser al menos 1");
+        return;
+      }
+    }
+
+    // Validar compañía (obligatoria)
+    if (!formData.companyId) {
+      toast.error("Debes seleccionar una compañía");
+      return;
+    }
+
+    // Validar comisión: debe estar definida (ya sea de compañía o manual) y puede ser 0 pero no vacía
     const finalCommission =
-      formData.commissionPercentage !== undefined
+      formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
         ? formData.commissionPercentage
         : formData.companyId
         ? companies.find((c) => c.id === formData.companyId)?.commissionPercentage
         : undefined;
 
-    if (finalCommission === undefined) {
-      toast.error("Debes ingresar un porcentaje de comisión o seleccionar una compañía");
+    if (finalCommission === undefined || finalCommission === null) {
+      toast.error("Debes ingresar un porcentaje de comisión (puede ser 0)");
       return;
     }
 
@@ -367,7 +382,8 @@ export default function BookingsPage() {
 
       const payload: BookingFormData = {
         ...formData,
-        transportId: needsTransport ? formData.transportId : null,
+        transport: formData.transport || false,
+        passengerCount: formData.transport ? formData.passengerCount : null,
         commissionPercentage: finalCommission,
       };
 
@@ -436,6 +452,22 @@ export default function BookingsPage() {
       key: "companyName",
       header: "Compañía",
       accessor: (b) => b.companyName || "-",
+    },
+    {
+      key: "transport",
+      header: "Transporte",
+      width: "120px",
+      align: "center",
+      render: (b) => (
+        <span
+          style={{
+            ...badgeStyles.base,
+            ...(b.transport ? badgeStyles.success : badgeStyles.info),
+          }}
+        >
+          {b.transport ? `Sí${b.passengerCount ? ` (${b.passengerCount})` : ""}` : "No"}
+        </span>
+      ),
     },
     {
       key: "commissionPercentage",
@@ -600,23 +632,39 @@ export default function BookingsPage() {
 
               {/* Paso 2: Seleccionar Fecha (solo si hay actividad seleccionada) */}
               {selectedActivityId && (
-                <FormCombobox
-                  label="Fecha y Hora Disponible"
-                  value={selectedScheduleId}
-                  onChange={(value) => {
-                    setSelectedScheduleId(String(value));
-                  }}
-                  options={scheduleOptions}
-                  placeholder={
-                    availableSchedules.length === 0
-                      ? "Cargando fechas..."
-                      : "Selecciona una fecha"
-                  }
-                  searchPlaceholder="Buscar fecha..."
-                  required
-                  fullWidth
-                  disabled={formLoading || availableSchedules.length === 0}
-                />
+                <>
+                  {availableSchedules.length === 0 && !catalogsLoading && (
+                    <div
+                      style={{
+                        padding: "12px",
+                        backgroundColor: "#fef3c7",
+                        borderRadius: "8px",
+                        border: "1px solid #fbbf24",
+                        color: "#92400e",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      No hay fechas disponibles para esta actividad. Por favor, selecciona otra actividad o crea una planeación para esta actividad.
+                    </div>
+                  )}
+                  <FormCombobox
+                    label="Fecha y Hora Disponible"
+                    value={selectedScheduleId}
+                    onChange={(value) => {
+                      setSelectedScheduleId(String(value));
+                    }}
+                    options={scheduleOptions}
+                    placeholder={
+                      availableSchedules.length === 0
+                        ? "No hay fechas disponibles"
+                        : "Selecciona una fecha"
+                    }
+                    searchPlaceholder="Buscar fecha..."
+                    required
+                    fullWidth
+                    disabled={formLoading || availableSchedules.length === 0}
+                  />
+                </>
               )}
 
               {/* Información de disponibilidad */}
@@ -656,12 +704,17 @@ export default function BookingsPage() {
                 min={1}
                 max={availabilityInfo?.availableSpaces || undefined}
                 value={formData.numberOfPeople || ""}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const newNumberOfPeople = e.target.value ? parseInt(e.target.value, 10) : 1;
                   setFormData({
                     ...formData,
-                    numberOfPeople: e.target.value ? parseInt(e.target.value, 10) : 1,
-                  })
-                }
+                    numberOfPeople: newNumberOfPeople,
+                    // Si transport está activo y passengerCount está vacío o es menor, actualizarlo
+                    passengerCount: formData.transport && (!formData.passengerCount || formData.passengerCount < newNumberOfPeople)
+                      ? newNumberOfPeople
+                      : formData.passengerCount,
+                  });
+                }}
                 required
                 fullWidth
                 disabled={formLoading || !availabilityInfo}
@@ -688,7 +741,7 @@ export default function BookingsPage() {
                   disabled={formLoading}
                 />
                 <FormInput
-                  label="Email (opcional)"
+                  label="Email"
                   type="email"
                   value={formData.customerEmail || ""}
                   onChange={(e) =>
@@ -697,11 +750,12 @@ export default function BookingsPage() {
                       customerEmail: e.target.value || null,
                     })
                   }
+                  required
                   fullWidth
                   disabled={formLoading}
                 />
                 <FormInput
-                  label="Teléfono (opcional)"
+                  label="Teléfono"
                   value={formData.customerPhone || ""}
                   onChange={(e) =>
                     setFormData({
@@ -709,6 +763,7 @@ export default function BookingsPage() {
                       customerPhone: e.target.value || null,
                     })
                   }
+                  required
                   fullWidth
                   disabled={formLoading}
                 />
@@ -718,27 +773,36 @@ export default function BookingsPage() {
               <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
                 <FormCheckbox
                   label="Requiere Transporte"
-                  checked={needsTransport}
+                  checked={formData.transport || false}
                   onChange={(e) => {
-                    setNeedsTransport(e.target.checked);
-                    if (!e.target.checked) {
-                      setFormData({ ...formData, transportId: null });
-                    }
+                    const needsTransport = e.target.checked;
+                    setFormData({
+                      ...formData,
+                      transport: needsTransport,
+                      passengerCount: needsTransport ? (formData.passengerCount || formData.numberOfPeople) : null,
+                    });
                   }}
                   disabled={formLoading}
                 />
-                {needsTransport && (
-                  <FormCombobox
-                    label="Transporte"
-                    value={formData.transportId || ""}
-                    onChange={(value) =>
-                      setFormData({ ...formData, transportId: String(value) || null })
-                    }
-                    options={transportOptions}
-                    placeholder="Selecciona un transporte"
-                    searchPlaceholder="Buscar transporte..."
+                {formData.transport && (
+                  <FormInput
+                    label="Cantidad de Pasajeros para Transporte"
+                    type="number"
+                    min={1}
+                    value={formData.passengerCount !== null && formData.passengerCount !== undefined ? formData.passengerCount : ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Permitir que se limpie el campo, pero validar al enviar
+                      setFormData({
+                        ...formData,
+                        passengerCount: value !== "" ? parseInt(value, 10) : null,
+                      });
+                    }}
+                    required
                     fullWidth
-                    disabled={formLoading || transportOptions.length === 0}
+                    disabled={formLoading}
+                    placeholder="Cantidad de pasajeros"
+                    helperText="Indica la cantidad de pasajeros que necesitan transporte (mínimo 1). Se establece automáticamente igual a la cantidad de personas."
                   />
                 )}
               </div>
@@ -749,7 +813,7 @@ export default function BookingsPage() {
                   Comisión
                 </h4>
                 <FormCombobox
-                  label="Compañía (opcional)"
+                  label="Compañía"
                   value={formData.companyId || ""}
                   onChange={(value) => {
                     const companyId = value ? String(value) : null;
@@ -762,8 +826,9 @@ export default function BookingsPage() {
                     });
                   }}
                   options={companyOptions}
-                  placeholder="Selecciona una compañía (opcional)"
+                  placeholder="Selecciona una compañía"
                   searchPlaceholder="Buscar compañía..."
+                  required
                   fullWidth
                   disabled={formLoading}
                 />
@@ -774,30 +839,31 @@ export default function BookingsPage() {
                   max={100}
                   step="0.1"
                   value={
-                    formData.commissionPercentage !== undefined
+                    formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
                       ? formData.commissionPercentage
                       : formData.companyId
                       ? companies.find((c) => c.id === formData.companyId)?.commissionPercentage || ""
                       : ""
                   }
                   onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                    const value = e.target.value;
                     setFormData({
                       ...formData,
-                      commissionPercentage: value,
+                      commissionPercentage: value !== "" ? parseFloat(value) : undefined,
                     });
                   }}
+                  required
                   fullWidth
                   disabled={formLoading}
                   placeholder={
                     formData.companyId
                       ? `Usará ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}% de la compañía`
-                      : "Ingresa manualmente o selecciona una compañía"
+                      : "Ingresa el porcentaje de comisión"
                   }
                   helperText={
                     formData.companyId
-                      ? "Puedes sobrescribir el porcentaje de la compañía ingresando un valor manual"
-                      : "Si no seleccionas una compañía, ingresa el porcentaje manualmente"
+                      ? "Puedes sobrescribir el porcentaje de la compañía ingresando un valor manual (puede ser 0)"
+                      : "Ingresa el porcentaje de comisión (puede ser 0)"
                   }
                 />
               </div>

@@ -216,9 +216,16 @@ export function FormCombobox({
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}>
             {value && !disabled && (
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={handleClear}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleClear(e as any);
+                  }
+                }}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -227,11 +234,12 @@ export function FormCombobox({
                   display: 'flex',
                   alignItems: 'center',
                   color: '#64748b',
+                  outline: 'none',
                 }}
                 aria-label="Limpiar selección"
               >
                 <X size={14} />
-              </button>
+              </div>
             )}
             <ChevronDown
               size={16}

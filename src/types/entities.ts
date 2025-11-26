@@ -450,8 +450,9 @@ export interface Booking {
   id: string;
   activityScheduleId: string;
   companyId?: string | null;
-  transportId?: string | null;
+  transport: boolean;
   numberOfPeople: number;
+  passengerCount?: number | null;
   commissionPercentage: number;
   customerName: string;
   customerEmail?: string | null;
@@ -465,18 +466,17 @@ export interface Booking {
   scheduledStart?: string;
   scheduledEnd?: string;
   companyName?: string | null;
-  transportModel?: string | null;
   activityId?: string;
   activityPartySize?: number;
   companyCommissionPercentage?: number | null;
-  transportCapacity?: number | null;
 }
 
 export interface BookingFormData {
   activityScheduleId: string;
   companyId?: string | null;
-  transportId?: string | null;
+  transport?: boolean;
   numberOfPeople: number;
+  passengerCount?: number | null;
   commissionPercentage?: number;
   customerName: string;
   customerEmail?: string | null;

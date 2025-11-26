@@ -50,7 +50,7 @@ export function FormInput({
   };
 
   const focusStyles: React.CSSProperties = {
-    borderColor: error ? '#ef4444' : '#22c55e',
+    border: error ? '1px solid #ef4444' : '1px solid #22c55e',
     boxShadow: error 
       ? '0 0 0 3px rgba(239, 68, 68, 0.1)' 
       : '0 0 0 3px rgba(34, 197, 94, 0.1)',

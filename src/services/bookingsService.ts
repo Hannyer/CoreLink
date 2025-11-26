@@ -16,8 +16,9 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
     id: apiBooking.id,
     activityScheduleId: apiBooking.activityScheduleId || apiBooking.activity_schedule_id,
     companyId: apiBooking.companyId || apiBooking.company_id || null,
-    transportId: apiBooking.transportId || apiBooking.transport_id || null,
+    transport: apiBooking.transport ?? false,
     numberOfPeople: apiBooking.numberOfPeople || apiBooking.number_of_people || 0,
+    passengerCount: apiBooking.passengerCount !== undefined ? apiBooking.passengerCount : (apiBooking.passenger_count !== undefined ? apiBooking.passenger_count : null),
     commissionPercentage: apiBooking.commissionPercentage || apiBooking.commission_percentage || 0,
     customerName: apiBooking.customerName || apiBooking.customer_name,
     customerEmail: apiBooking.customerEmail || apiBooking.customer_email || null,
@@ -31,11 +32,9 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
     scheduledStart: apiBooking.scheduledStart || apiBooking.scheduled_start,
     scheduledEnd: apiBooking.scheduledEnd || apiBooking.scheduled_end,
     companyName: apiBooking.companyName || apiBooking.company_name || null,
-    transportModel: apiBooking.transportModel || apiBooking.transport_model || null,
     activityId: apiBooking.activityId || apiBooking.activity_id,
     activityPartySize: apiBooking.activityPartySize || apiBooking.activity_party_size,
     companyCommissionPercentage: apiBooking.companyCommissionPercentage || apiBooking.company_commission_percentage || null,
-    transportCapacity: apiBooking.transportCapacity || apiBooking.transport_capacity || null,
   };
 }
 
@@ -44,17 +43,33 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
  */
 export async function getAvailableSchedulesByActivityId(activityId: string): Promise<AvailableSchedule[]> {
   const { data } = await api.get<any[]>(`/api/bookings/activities/${activityId}/schedules`);
-  return data.map((item) => ({
-    id: item.id,
-    activityId: item.activityId || item.activity_id,
-    scheduledStart: item.scheduledStart || item.scheduled_start,
-    scheduledEnd: item.scheduledEnd || item.scheduled_end,
-    status: item.status ?? true,
-    activityTitle: item.activityTitle || item.activity_title,
-    partySize: item.partySize || item.party_size || 0,
-    bookedPeople: item.bookedPeople || item.booked_people || 0,
-    availableSpaces: item.availableSpaces || item.available_spaces || 0,
-  }));
+  return data.map((item) => {
+    // Convertir bookedPeople a número si viene como string
+    const bookedPeople = typeof item.bookedPeople === 'string' 
+      ? parseInt(item.bookedPeople, 10) || 0
+      : (item.bookedPeople || item.booked_people || 0);
+    
+    const partySize = item.partySize || item.party_size || 0;
+    
+    // Calcular availableSpaces si no viene del API
+    const availableSpaces = item.availableSpaces !== undefined 
+      ? item.availableSpaces 
+      : (item.available_spaces !== undefined 
+          ? item.available_spaces 
+          : Math.max(0, partySize - bookedPeople));
+    
+    return {
+      id: item.id,
+      activityId: item.activityId || item.activity_id,
+      scheduledStart: item.scheduledStart || item.scheduled_start,
+      scheduledEnd: item.scheduledEnd || item.scheduled_end,
+      status: item.status ?? true,
+      activityTitle: item.activityTitle || item.activity_title,
+      partySize,
+      bookedPeople,
+      availableSpaces,
+    };
+  });
 }
 
 /**
@@ -127,10 +142,13 @@ export async function createBooking(payload: BookingFormData): Promise<Booking> 
     activityScheduleId: payload.activityScheduleId,
     numberOfPeople: payload.numberOfPeople,
     customerName: payload.customerName,
+    transport: payload.transport ?? false,
   };
 
   if (payload.companyId) apiPayload.companyId = payload.companyId;
-  if (payload.transportId) apiPayload.transportId = payload.transportId;
+  if (payload.transport && payload.passengerCount !== undefined) {
+    apiPayload.passengerCount = payload.passengerCount;
+  }
   if (payload.commissionPercentage !== undefined) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.customerEmail) apiPayload.customerEmail = payload.customerEmail;
   if (payload.customerPhone) apiPayload.customerPhone = payload.customerPhone;
@@ -148,7 +166,12 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
 
   if (payload.activityScheduleId !== undefined) apiPayload.activityScheduleId = payload.activityScheduleId;
   if (payload.companyId !== undefined) apiPayload.companyId = payload.companyId;
-  if (payload.transportId !== undefined) apiPayload.transportId = payload.transportId;
+  if (payload.transport !== undefined) apiPayload.transport = payload.transport;
+  if (payload.transport && payload.passengerCount !== undefined) {
+    apiPayload.passengerCount = payload.passengerCount;
+  } else if (payload.transport === false) {
+    apiPayload.passengerCount = null;
+  }
   if (payload.numberOfPeople !== undefined) apiPayload.numberOfPeople = payload.numberOfPeople;
   if (payload.commissionPercentage !== undefined) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.customerName !== undefined) apiPayload.customerName = payload.customerName;

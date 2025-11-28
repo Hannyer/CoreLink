@@ -36,6 +36,8 @@ function mapApiActivityToActivity(apiActivity: any): Activity {
 function mapApiScheduleToSchedule(apiSchedule: any): ActivitySchedule {
   return {
     id: apiSchedule.id,
+    capacity: apiSchedule.capacity ?? 0,
+    bookedCount: apiSchedule.bookedCount ?? 0,  
     activityId: apiSchedule.activityId || apiSchedule.activity_id,
     scheduledStart: apiSchedule.scheduledStart || apiSchedule.scheduled_start,
     scheduledEnd: apiSchedule.scheduledEnd || apiSchedule.scheduled_end,

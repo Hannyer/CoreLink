@@ -139,6 +139,9 @@ export interface ActivitySchedule {
   scheduledEnd: string; // ISO datetime
   status: boolean; // true = activa, false = inactiva
   activityTitle?: string; // Para mostrar en listas
+  capacity: number; // Capacidad máxima del horario
+  bookedCount: number; // Cantidad de personas ya reservadas
+  availableSpaces?: number; // Espacios disponibles (calculado: capacity - bookedCount)
 }
 
 // ============================================
@@ -292,6 +295,54 @@ export interface ActivityScheduleFormData {
   scheduledStart: string; // ISO datetime
   scheduledEnd: string; // ISO datetime
   status?: boolean; // true = activa, false = inactiva
+  capacity?: number; // Capacidad máxima del horario
+}
+
+// ============================================
+// BULK SCHEDULE CREATION (Inserción Masiva)
+// ============================================
+export interface TimeSlot {
+  startTime: string; // Formato HH:mm (ej: "08:00")
+  endTime: string; // Formato HH:mm (ej: "11:00")
+  capacity: number; // Capacidad para este horario
+}
+
+export interface BulkScheduleRequest {
+  activityId: string;
+  startDate: string; // Formato YYYY-MM-DD
+  endDate: string; // Formato YYYY-MM-DD
+  timeSlots: TimeSlot[];
+  validateOverlaps?: boolean; // Por defecto true
+}
+
+export interface BulkScheduleResponse {
+  created: number; // Cantidad de horarios creados
+  conflicts?: Array<{
+    date: string;
+    timeSlot: TimeSlot;
+    reason: string;
+  }>;
+}
+
+// ============================================
+// SCHEDULE AVAILABILITY (Disponibilidad)
+// ============================================
+export interface ScheduleAvailability {
+  id: string;
+  activityId: string;
+  activityTitle?: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  capacity: number;
+  bookedCount: number;
+  availableSpaces: number;
+  status: boolean;
+}
+
+export interface ScheduleAvailabilityFilters {
+  activityId?: string;
+  startDate?: string; // Formato YYYY-MM-DD
+  endDate?: string; // Formato YYYY-MM-DD
 }
 
 export interface GuideFormData {

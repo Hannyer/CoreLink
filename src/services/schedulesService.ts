@@ -3,12 +3,22 @@ import type {
   ActivitySchedule,
   ActivityScheduleFormData,
   PaginatedResponse,
+  BulkScheduleRequest,
+  BulkScheduleResponse,
+  ScheduleAvailability,
+  ScheduleAvailabilityFilters,
+  TimeSlot,
 } from "@/types/entities";
 
 /**
  * Función auxiliar para mapear la respuesta del API al formato del frontend
  */
 function mapApiScheduleToSchedule(apiSchedule: any): ActivitySchedule {
+  const capacity = apiSchedule.capacity ?? 0;
+  const bookedCount = typeof apiSchedule.bookedCount === 'string' 
+    ? parseInt(apiSchedule.bookedCount, 10) || 0
+    : (apiSchedule.bookedCount ?? apiSchedule.booked_count ?? 0);
+  
   return {
     id: apiSchedule.id,
     activityId: apiSchedule.activityId || apiSchedule.activity_id,
@@ -16,6 +26,9 @@ function mapApiScheduleToSchedule(apiSchedule: any): ActivitySchedule {
     scheduledEnd: apiSchedule.scheduledEnd || apiSchedule.scheduled_end,
     status: apiSchedule.status ?? true,
     activityTitle: apiSchedule.activityTitle || apiSchedule.activity_title,
+    capacity,
+    bookedCount,
+    availableSpaces: Math.max(0, capacity - bookedCount),
   };
 }
 
@@ -46,6 +59,7 @@ export async function createSchedule(
     scheduledStart: payload.scheduledStart,
     scheduledEnd: payload.scheduledEnd,
     status: payload.status ?? true,
+    capacity: payload.capacity ?? 0,
   };
 
   const { data } = await api.post<any>(`/api/activities/${activityId}/schedules`, apiPayload);
@@ -64,6 +78,7 @@ export async function updateSchedule(
   if (payload.scheduledStart !== undefined) apiPayload.scheduledStart = payload.scheduledStart;
   if (payload.scheduledEnd !== undefined) apiPayload.scheduledEnd = payload.scheduledEnd;
   if (payload.status !== undefined) apiPayload.status = payload.status;
+  if (payload.capacity !== undefined) apiPayload.capacity = payload.capacity;
 
   const { data } = await api.put<any>(`/api/activities/schedules/${scheduleId}`, apiPayload);
   return mapApiScheduleToSchedule(data);
@@ -85,27 +100,67 @@ export async function toggleScheduleStatus(scheduleId: string, status: boolean):
 }
 
 /**
- * Lista todas las planeaciones con paginación
- * Nota: Este endpoint no existe en el backend, pero podemos obtener todas las planeaciones
- * de todas las actividades. Por ahora, usaremos una función que obtiene todas las actividades
- * y luego sus planeaciones, o podemos crear un endpoint específico.
- * 
- * Por simplicidad, vamos a crear una función que obtiene todas las planeaciones
- * de todas las actividades (esto puede ser ineficiente, pero funciona para empezar)
+ * Inserción masiva de horarios (endpoint POST /api/activities/{activityId}/schedules/bulk)
  */
-export async function listAllSchedules(
-  page: number = 1,
-  limit: number = 10
-): Promise<PaginatedResponse<ActivitySchedule>> {
-  // Como no hay un endpoint directo para listar todas las planeaciones,
-  // necesitaremos obtenerlas de otra manera. Por ahora, retornamos una estructura vacía
-  // y el frontend puede implementar la lógica de obtener actividades y luego sus schedules
-  return {
-    items: [],
-    total: 0,
-    page: page,
-    pageSize: limit,
-    totalPages: 0,
-  };
+export async function bulkCreateSchedules(
+  request: BulkScheduleRequest
+): Promise<BulkScheduleResponse> {
+  const { data } = await api.post<BulkScheduleResponse>(
+    `/api/activities/${request.activityId}/schedules/bulk`,
+    {
+      startDate: request.startDate,
+      endDate: request.endDate,
+      timeSlots: request.timeSlots,
+      validateOverlaps: request.validateOverlaps ?? true,
+    }
+  );
+  return data;
+}
+
+/**
+ * Sumar asistentes a un horario (endpoint POST /api/activities/schedules/{scheduleId}/attendees)
+ */
+export async function addAttendeesToSchedule(
+  scheduleId: string,
+  quantity: number
+): Promise<ActivitySchedule> {
+  const { data } = await api.post<any>(
+    `/api/activities/schedules/${scheduleId}/attendees`,
+    { quantity }
+  );
+  return mapApiScheduleToSchedule(data);
+}
+
+/**
+ * Consultar disponibilidad de horarios (endpoint GET /api/activities/schedules/availability)
+ */
+export async function getScheduleAvailability(
+  filters: ScheduleAvailabilityFilters
+): Promise<ScheduleAvailability[]> {
+  const params = new URLSearchParams();
+  if (filters.activityId) params.append('activityId', filters.activityId);
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+
+  const { data } = await api.get<ScheduleAvailability[]>(
+    `/api/activities/schedules/availability?${params.toString()}`
+  );
+  return data.map((item) => ({
+    ...item,
+    availableSpaces: Math.max(0, (item.capacity || 0) - (item.bookedCount || 0)),
+  }));
+}
+
+/**
+ * Obtener horarios disponibles por día (endpoint GET /api/activities/{activityId}/schedules/available)
+ */
+export async function getAvailableSchedulesByDate(
+  activityId: string,
+  date: string
+): Promise<ActivitySchedule[]> {
+  const { data } = await api.get<any[]>(
+    `/api/activities/${activityId}/schedules/available?date=${date}`
+  );
+  return data.map(mapApiScheduleToSchedule);
 }
 

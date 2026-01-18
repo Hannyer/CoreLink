@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { TableCard, badgeStyles, type Column } from "@/components/ui/TableCard";
 import { fetchGuidesWithPagination, createGuide, updateGuide, deleteGuide } from "@/services/guideService";
+import { getLanguages, type Language } from "@/services/languageService";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -46,13 +47,16 @@ export default function GuidesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
+  // Estado para idiomas
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [loadingLanguages, setLoadingLanguages] = useState(false);
+
   const [formData, setFormData] = useState<GuideFormData>({
     name: "",
     email: "",
     phone: "",
-    isLeader: false,
-    maxPartySize: undefined,
     status: "activo",
+    languageIds: [],
   });
 
   useEffect(() => {
@@ -74,29 +78,42 @@ export default function GuidesPage() {
     }
   };
 
+  const loadLanguages = async () => {
+    try {
+      setLoadingLanguages(true);
+      const languagesList = await getLanguages();
+      setLanguages(languagesList);
+    } catch (error) {
+      console.error("Error al cargar idiomas:", error);
+      toast.error("Error al cargar idiomas");
+    } finally {
+      setLoadingLanguages(false);
+    }
+  };
+
   const handleCreate = () => {
     setEditingGuide(null);
     setFormData({
       name: "",
       email: "",
       phone: "",
-      isLeader: false,
-      maxPartySize: undefined,
       status: "activo",
+      languageIds: [],
     });
+    loadLanguages();
     setShowModal(true);
   };
 
   const handleEdit = (guide: Guide) => {
-    setEditingGuide(guide);
+    setEditingGuide(guide); console.log(guide);
     setFormData({
       name: guide.name,
       email: guide.email || "",
       phone: guide.phone || "",
-      isLeader: guide.isLeader,
-      maxPartySize: guide.maxPartySize ?? undefined,
       status: guide.status, // Ya es 'activo' | 'inactivo'
+      languageIds: guide.languages?.map(lang => lang.id) || [],
     });
+    loadLanguages();
     setShowModal(true);
   };
 
@@ -137,14 +154,22 @@ export default function GuidesPage() {
       return;
     }
 
+    // Validar que se seleccione mínimo un idioma
+    if (!formData.languageIds || formData.languageIds.length === 0) {
+      toast.error("Debe seleccionar al menos un idioma");
+      return;
+    }
+
     try {
       setFormLoading(true);
       
-      // Convertir status de 'activo'|'inactivo' a boolean para el servicio
+      // Preparar el payload con los datos del formulario
       const payload: GuideFormData = {
-        ...formData,
+        name: formData.name,
         email: formData.email || undefined,
         phone: formData.phone || undefined,
+        status: formData.status,
+        languageIds: formData.languageIds || [], // Asegurar que siempre esté presente
       };
 
       if (editingGuide) {
@@ -165,27 +190,26 @@ export default function GuidesPage() {
     }
   };
 
+  const handleLanguageToggle = (languageId: string) => {
+    const currentIds = formData.languageIds || [];
+    const newIds = currentIds.includes(languageId)
+      ? currentIds.filter(id => id !== languageId)
+      : [...currentIds, languageId];
+    
+    setFormData({ ...formData, languageIds: newIds });
+  };
+
   const columns: Column<Guide>[] = [
     { key: "name", header: "Nombre", accessor: (g) => g.name },
     { key: "email", header: "Email", accessor: (g) => g.email || "-" },
     { key: "phone", header: "Teléfono", accessor: (g) => g.phone || "-" },
     {
-      key: "isLeader",
-      header: "Líder",
-      width: "120px",
-      align: "center",
-      render: (g) => (
-        <span style={{ ...badgeStyles.base, ...(g.isLeader ? badgeStyles.success : badgeStyles.danger) }}>
-          {g.isLeader ? "Sí" : "No"}
-        </span>
-      ),
-    },
-    {
-      key: "maxPartySize",
-      header: "Máx. Personas",
-      width: "140px",
-      align: "center",
-      accessor: (g) => (g.maxPartySize ?? "-"),
+      key: "languages",
+      header: "Idiomas",
+      accessor: (g) => {
+        if (!g.languages || g.languages.length === 0) return "-";
+        return g.languages.map(l => l.name).join(", ");
+      },
     },
     {
       key: "status",
@@ -296,28 +320,6 @@ export default function GuidesPage() {
             disabled={formLoading}
           />
 
-          <FormInput
-            label="Máximo de Personas"
-            type="number"
-            value={formData.maxPartySize || ""}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                maxPartySize: e.target.value ? parseInt(e.target.value) : undefined,
-              })
-            }
-            min={1}
-            fullWidth
-            disabled={formLoading}
-          />
-
-          <FormCheckbox
-            label="Es Líder"
-            checked={formData.isLeader}
-            onChange={(e) => setFormData({ ...formData, isLeader: e.target.checked })}
-            disabled={formLoading}
-          />
-
           <FormCheckbox
             label="Activo"
             checked={formData.status === "activo"}
@@ -326,6 +328,63 @@ export default function GuidesPage() {
             }
             disabled={formLoading}
           />
+
+          <div style={{ marginTop: "16px", marginBottom: "8px" }}>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: "#1e293b",
+              }}
+            >
+              Idiomas <span style={{ color: "#ef4444", marginLeft: "4px" }}>*</span>
+            </label>
+            {loadingLanguages ? (
+              <div style={{ color: "#64748b", fontSize: "0.875rem" }}>Cargando idiomas...</div>
+            ) : languages.length === 0 ? (
+              <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>No hay idiomas disponibles</div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  padding: "12px",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  borderRadius: "8px",
+                  backgroundColor: formLoading ? "#f1f5f9" : "#ffffff",
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                }}
+              >
+                {languages.map((language) => (
+                  <FormCheckbox
+                    key={language.id}
+                    label={`${language.name} (${language.code})`}
+                    checked={(formData.languageIds || []).includes(language.id)}
+                    onChange={() => handleLanguageToggle(language.id)}
+                    disabled={formLoading}
+                  />
+                ))}
+              </div>
+            )}
+            {(!formData.languageIds || formData.languageIds.length === 0) && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  marginTop: "6px",
+                  fontSize: "0.875rem",
+                  color: "#ef4444",
+                }}
+              >
+                <span>Debe seleccionar al menos un idioma</span>
+              </div>
+            )}
+          </div>
 
           <div
             style={{

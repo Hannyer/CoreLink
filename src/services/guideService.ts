@@ -24,6 +24,7 @@ function mapApiGuideToGuide(apiGuide: any): Guide {
     isLeader: apiGuide.isLeader ?? apiGuide.isleader ?? apiGuide.is_leader ?? false,
     maxPartySize: apiGuide.maxPartySize ?? apiGuide.maxpartysize ?? apiGuide.max_party_size ?? undefined,
     status: apiGuide.status ? 'activo' : 'inactivo',
+    languages: apiGuide.languages || undefined,
     createdAt: apiGuide.createdAt || new Date().toISOString(),
     updatedAt: apiGuide.updatedAt || new Date().toISOString(),
   };
@@ -124,14 +125,17 @@ export async function getGuide(id: string): Promise<Guide> {
  */
 export async function createGuide(payload: GuideFormData): Promise<Guide> {
   // Mapear formato del frontend al formato del API
-  const apiPayload = {
+  const apiPayload: any = {
     fullName: payload.name,
     email: payload.email || undefined,
     phone: payload.phone || undefined,
-    isLeader: payload.isLeader,
     status: payload.status === 'activo',
-    maxPartySize: payload.maxPartySize || undefined,
   };
+  
+  // Incluir languageIds si están presentes
+  if (payload.languageIds && payload.languageIds.length > 0) {
+    apiPayload.languageIds = payload.languageIds;
+  }
   
   const { data } = await api.post<any>("/api/guides", apiPayload);
   return mapApiGuideToGuide(data);
@@ -150,6 +154,11 @@ export async function updateGuide(id: string, payload: Partial<GuideFormData>): 
   if (payload.isLeader !== undefined) apiPayload.isLeader = payload.isLeader;
   if (payload.status !== undefined) apiPayload.status = payload.status === 'activo';
   if (payload.maxPartySize !== undefined) apiPayload.maxPartySize = payload.maxPartySize;
+  
+  // Incluir languageIds siempre que esté presente en el payload (incluso si es array vacío)
+  if (payload.languageIds !== undefined) {
+    apiPayload.languageIds = payload.languageIds;
+  }
   
   const { data } = await api.put<any>(`/api/guides/${id}`, apiPayload);
   return mapApiGuideToGuide(data);

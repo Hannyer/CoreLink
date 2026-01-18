@@ -76,6 +76,7 @@ export interface Guide {
   isLeader: boolean; // Guía Líder o Normal
   maxPartySize?: number; // Máximo de personas que puede guiar
   status: 'activo' | 'inactivo';
+  languages?: Array<{ id: string; code: string; name: string }>; // Idiomas del guía
   assignments?: GuideAssignment[]; // Asignaciones actuales
   createdAt: string;
   updatedAt: string;
@@ -349,9 +350,8 @@ export interface GuideFormData {
   name: string;
   email?: string;
   phone?: string;
-  isLeader: boolean;
-  maxPartySize?: number;
   status: 'activo' | 'inactivo';
+  languageIds?: string[]; // IDs de idiomas seleccionados
 }
 
 export interface VehicleFormData {

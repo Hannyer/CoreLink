@@ -68,6 +68,7 @@ export default function BookingsPage() {
   const [selectedActivityId, setSelectedActivityId] = useState<string>("");
   const [availableSchedules, setAvailableSchedules] = useState<AvailableSchedule[]>([]);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
+  const [selectedSchedule, setSelectedSchedule] = useState<AvailableSchedule | null>(null);
   const [availabilityInfo, setAvailabilityInfo] = useState<AvailabilityInfo | null>(null);
 
   // Catálogos
@@ -158,17 +159,22 @@ export default function BookingsPage() {
     } else {
       setAvailableSchedules([]);
       setSelectedScheduleId("");
+      setSelectedSchedule(null);
       setAvailabilityInfo(null);
     }
   }, [selectedActivityId]);
 
   useEffect(() => {
     if (selectedScheduleId) {
+      // Encontrar el schedule seleccionado para obtener los precios
+      const schedule = availableSchedules.find((s) => s.id === selectedScheduleId);
+      setSelectedSchedule(schedule || null);
       loadAvailability();
     } else {
+      setSelectedSchedule(null);
       setAvailabilityInfo(null);
     }
-  }, [selectedScheduleId]);
+  }, [selectedScheduleId, availableSchedules]);
 
   useEffect(() => {
     if (
@@ -256,10 +262,17 @@ export default function BookingsPage() {
     }
   };
 
+  const handleCloseBookingModal = () => {
+    if (formLoading) return;
+    setShowBookingModal(false);
+    setSelectedSchedule(null);
+  };
+
   const handleCreateBooking = () => {
     setEditingBooking(null);
     setSelectedActivityId("");
     setSelectedScheduleId("");
+    setSelectedSchedule(null);
     setAvailabilityInfo(null);
     setFormData({
       activityScheduleId: "",
@@ -290,6 +303,14 @@ export default function BookingsPage() {
       setEditingBooking(booking);
       setSelectedActivityId(booking.activityId || "");
       setSelectedScheduleId(booking.activityScheduleId);
+      
+      // Cargar schedules para obtener los precios
+      if (booking.activityId) {
+        const schedules = await getAvailableSchedulesByActivityId(booking.activityId);
+        const schedule = schedules.find((s) => s.id === booking.activityScheduleId);
+        setSelectedSchedule(schedule || null);
+      }
+      
       setFormData({
         activityScheduleId: booking.activityScheduleId,
         companyId: booking.companyId ?? null,
@@ -347,6 +368,20 @@ export default function BookingsPage() {
       return Number.isNaN(n) ? 0 : Math.max(0, n);
     }
     return Math.max(0, Number(v));
+  };
+
+  const parsePrice = (price: number | string | undefined | null): number => {
+    if (price === undefined || price === null) return 0;
+    if (typeof price === "number") return price;
+    if (typeof price === "string") {
+      const parsed = parseFloat(price);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const formatPrice = (price: number | string | undefined | null): string => {
+    return parsePrice(price).toFixed(2);
   };
 
   const handleSubmitBooking = async (e: React.FormEvent) => {
@@ -458,6 +493,7 @@ export default function BookingsPage() {
       }
 
       setShowBookingModal(false);
+      setSelectedSchedule(null);
       await loadBookings();
     } catch (error) {
       console.error("Error al guardar reserva:", error);
@@ -686,6 +722,7 @@ export default function BookingsPage() {
                 onChange={(value) => {
                   setSelectedActivityId(String(value));
                   setSelectedScheduleId("");
+                  setSelectedSchedule(null);
                   setAvailabilityInfo(null);
                   setFormData((prev) => ({
                     ...prev,
@@ -722,6 +759,13 @@ export default function BookingsPage() {
                     value={selectedScheduleId}
                     onChange={(value) => {
                       setSelectedScheduleId(String(value));
+                      // Resetear cantidades cuando cambia el schedule
+                      setFormData((prev) => ({
+                        ...prev,
+                        adultCountInput: "",
+                        childCountInput: "",
+                        seniorCountInput: "",
+                      }));
                     }}
                     options={scheduleOptions}
                     placeholder={
@@ -734,6 +778,40 @@ export default function BookingsPage() {
                     fullWidth
                     disabled={formLoading || availableSchedules.length === 0}
                   />
+                  {/* Mostrar precios del schedule seleccionado */}
+                  {selectedSchedule && (
+                    <div
+                      style={{
+                        padding: "12px",
+                        backgroundColor: "#f8fafc",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: "8px" }}>Precios por persona:</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                        {selectedSchedule.adultPrice !== undefined && (
+                          <div>
+                            <span style={{ color: "#64748b" }}>Adultos:</span>{" "}
+                            <span style={{ fontWeight: 600 }}>${formatPrice(selectedSchedule.adultPrice)}</span>
+                          </div>
+                        )}
+                        {selectedSchedule.childPrice !== undefined && (
+                          <div>
+                            <span style={{ color: "#64748b" }}>Niños:</span>{" "}
+                            <span style={{ fontWeight: 600 }}>${formatPrice(selectedSchedule.childPrice)}</span>
+                          </div>
+                        )}
+                        {selectedSchedule.seniorPrice !== undefined && (
+                          <div>
+                            <span style={{ color: "#64748b" }}>Adultos mayores:</span>{" "}
+                            <span style={{ fontWeight: 600 }}>${formatPrice(selectedSchedule.seniorPrice)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -781,6 +859,7 @@ export default function BookingsPage() {
                   setFormData({
                     ...formData,
                     numberOfPeopleInput: inputValue,
+                    numberOfPeople: total,
                     adultCountInput: total,
                     childCountInput: 0,
                     seniorCountInput: 0,
@@ -802,46 +881,118 @@ export default function BookingsPage() {
                 }
               />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-                <FormInput
-                  label="Adultos"
-                  type="number"
-                  min={0}
-                  value={formData.adultCountInput}
-                  onChange={(e) => {
-                    const v = e.target.value === "" ? "" : e.target.value;
-                    setFormData({ ...formData, adultCountInput: v });
-                  }}
-                  fullWidth
-                  disabled={formLoading || !availabilityInfo}
-                  placeholder="0"
-                />
-                <FormInput
-                  label="Niños"
-                  type="number"
-                  min={0}
-                  value={formData.childCountInput}
-                  onChange={(e) => {
-                    const v = e.target.value === "" ? "" : e.target.value;
-                    setFormData({ ...formData, childCountInput: v });
-                  }}
-                  fullWidth
-                  disabled={formLoading || !availabilityInfo}
-                  placeholder="0"
-                />
-                <FormInput
-                  label="Adultos mayores"
-                  type="number"
-                  min={0}
-                  value={formData.seniorCountInput}
-                  onChange={(e) => {
-                    const v = e.target.value === "" ? "" : e.target.value;
-                    setFormData({ ...formData, seniorCountInput: v });
-                  }}
-                  fullWidth
-                  disabled={formLoading || !availabilityInfo}
-                  placeholder="0"
-                />
+                <div>
+                  <FormInput
+                    label="Adultos"
+                    type="number"
+                    min={0}
+                    value={formData.adultCountInput}
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? "" : e.target.value;
+                      const adultCount = parseCount(v);
+                      const childCount = parseCount(formData.childCountInput);
+                      const seniorCount = parseCount(formData.seniorCountInput);
+                      const total = adultCount + childCount + seniorCount;
+                      setFormData({
+                        ...formData,
+                        adultCountInput: v,
+                        numberOfPeopleInput: total > 0 ? total : "",
+                        numberOfPeople: total,
+                      });
+                    }}
+                    fullWidth
+                    disabled={formLoading || !availabilityInfo}
+                    placeholder="0"
+                  />
+                  {selectedSchedule?.adultPrice !== undefined && formData.adultCountInput !== "" && (
+                    <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
+                      {parseCount(formData.adultCountInput)} × ${formatPrice(selectedSchedule.adultPrice)} = ${(parseCount(formData.adultCountInput) * parsePrice(selectedSchedule.adultPrice)).toFixed(2)}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <FormInput
+                    label="Niños"
+                    type="number"
+                    min={0}
+                    value={formData.childCountInput}
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? "" : e.target.value;
+                      const adultCount = parseCount(formData.adultCountInput);
+                      const childCount = parseCount(v);
+                      const seniorCount = parseCount(formData.seniorCountInput);
+                      const total = adultCount + childCount + seniorCount;
+                      setFormData({
+                        ...formData,
+                        childCountInput: v,
+                        numberOfPeopleInput: total > 0 ? total : "",
+                        numberOfPeople: total,
+                      });
+                    }}
+                    fullWidth
+                    disabled={formLoading || !availabilityInfo}
+                    placeholder="0"
+                  />
+                  {selectedSchedule?.childPrice !== undefined && formData.childCountInput !== "" && (
+                    <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
+                      {parseCount(formData.childCountInput)} × ${formatPrice(selectedSchedule.childPrice)} = ${(parseCount(formData.childCountInput) * parsePrice(selectedSchedule.childPrice)).toFixed(2)}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <FormInput
+                    label="Adultos mayores"
+                    type="number"
+                    min={0}
+                    value={formData.seniorCountInput}
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? "" : e.target.value;
+                      const adultCount = parseCount(formData.adultCountInput);
+                      const childCount = parseCount(formData.childCountInput);
+                      const seniorCount = parseCount(v);
+                      const total = adultCount + childCount + seniorCount;
+                      setFormData({
+                        ...formData,
+                        seniorCountInput: v,
+                        numberOfPeopleInput: total > 0 ? total : "",
+                        numberOfPeople: total,
+                      });
+                    }}
+                    fullWidth
+                    disabled={formLoading || !availabilityInfo}
+                    placeholder="0"
+                  />
+                  {selectedSchedule?.seniorPrice !== undefined && formData.seniorCountInput !== "" && (
+                    <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
+                      {parseCount(formData.seniorCountInput)} × ${formatPrice(selectedSchedule.seniorPrice)} = ${(parseCount(formData.seniorCountInput) * parsePrice(selectedSchedule.seniorPrice)).toFixed(2)}
+                    </div>
+                  )}
+                </div>
               </div>
+              {/* Mostrar total general */}
+              {selectedSchedule && (
+                <div
+                  style={{
+                    padding: "12px",
+                    backgroundColor: "#f0f9ff",
+                    borderRadius: "8px",
+                    border: "1px solid #bae6fd",
+                    marginTop: "8px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontWeight: 600, color: "#0369a1" }}>Total:</span>
+                    <span style={{ fontWeight: 700, fontSize: "1.125rem", color: "#0369a1" }}>
+                      $
+                      {(
+                        (parseCount(formData.adultCountInput) * parsePrice(selectedSchedule.adultPrice)) +
+                        (parseCount(formData.childCountInput) * parsePrice(selectedSchedule.childPrice)) +
+                        (parseCount(formData.seniorCountInput) * parsePrice(selectedSchedule.seniorPrice))
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
               {(formData.adultCountInput !== "" || formData.childCountInput !== "" || formData.seniorCountInput !== "") && (
                 <div style={{ fontSize: "0.875rem", color: "#64748b" }}>
                   Suma actual:{" "}
@@ -1011,7 +1162,7 @@ export default function BookingsPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowBookingModal(false)}
+                onClick={handleCloseBookingModal}
                 disabled={formLoading}
               >
                 Cancelar

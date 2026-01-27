@@ -563,6 +563,9 @@ export interface AvailableSchedule extends ActivitySchedule {
   partySize: number;
   bookedPeople: number;
   availableSpaces: number;
+  adultPrice?: number;
+  childPrice?: number;
+  seniorPrice?: number;
 }
 
 export interface AvailabilityInfo {

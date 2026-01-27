@@ -70,6 +70,9 @@ export async function getAvailableSchedulesByActivityId(activityId: string): Pro
       partySize,
       bookedPeople,
       availableSpaces,
+      adultPrice: item.adultPrice ?? item.adult_price ?? undefined,
+      childPrice: item.childPrice ?? item.child_price ?? undefined,
+      seniorPrice: item.seniorPrice ?? item.senior_price ?? undefined,
     };
   });
 }

@@ -57,6 +57,9 @@ export interface Activity {
   activityTypeId: string;
   title: string;
   partySize: number;
+  adultPrice: number;
+  childPrice: number;
+  seniorPrice: number;
   status: boolean; // true = activa, false = inactiva
   activityTypeName?: string;
   schedulesCount?: number;
@@ -289,6 +292,9 @@ export interface ActivityFormData {
   activityTypeId: string;
   title: string;
   partySize: number;
+  adultPrice: number;
+  childPrice: number;
+  seniorPrice: number;
   status?: boolean; // true = activa, false = inactiva
 }
 
@@ -390,6 +396,9 @@ export interface ActivityScheduled {
   activityTypeName?: string;
   title: string;
   partySize: number;
+  adultPrice: number;
+  childPrice: number;
+  seniorPrice: number;
   status?: boolean;
   start: string; // ISO datetime
   end: string; // ISO datetime
@@ -414,6 +423,9 @@ export interface ActivityListItem {
   activityTypeName?: string;
   title: string;
   partySize: number;
+  adultPrice: number;
+  childPrice: number;
+  seniorPrice: number;
   status?: boolean;
   start: string;
   end: string;
@@ -429,6 +441,9 @@ export interface ActivityCreateRequest {
   activityTypeId: string;
   title: string;
   partySize: number;
+  adultPrice: number;
+  childPrice: number;
+  seniorPrice: number;
   status?: boolean;
   start?: string; // ISO datetime (opcional)
   end?: string; // ISO datetime (opcional)
@@ -444,6 +459,9 @@ export interface ActivityUpdateRequest {
   activityTypeId?: string;
   title?: string;
   partySize?: number;
+  adultPrice?: number;
+  childPrice?: number;
+  seniorPrice?: number;
   status?: boolean;
   start?: string; // ISO datetime (opcional)
   end?: string; // ISO datetime (opcional)
@@ -503,6 +521,9 @@ export interface Booking {
   companyId?: string | null;
   transport: boolean;
   numberOfPeople: number;
+  adultCount: number;
+  childCount: number;
+  seniorCount: number;
   passengerCount?: number | null;
   commissionPercentage: number;
   customerName: string;
@@ -527,6 +548,9 @@ export interface BookingFormData {
   companyId?: string | null;
   transport?: boolean;
   numberOfPeople: number;
+  adultCount: number;
+  childCount: number;
+  seniorCount: number;
   passengerCount?: number | null;
   commissionPercentage?: number;
   customerName: string;

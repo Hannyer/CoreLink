@@ -75,11 +75,25 @@ export default function BookingsPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(false);
 
-  const [formData, setFormData] = useState<BookingFormData>({
+  const [formData, setFormData] = useState<
+    BookingFormData & {
+      numberOfPeopleInput: string | number;
+      adultCountInput: string | number;
+      childCountInput: string | number;
+      seniorCountInput: string | number;
+    }
+  >({
     activityScheduleId: "",
     companyId: null,
     transport: false,
     numberOfPeople: 1,
+    numberOfPeopleInput: "",
+    adultCount: 0,
+    adultCountInput: "",
+    childCount: 0,
+    childCountInput: "",
+    seniorCount: 0,
+    seniorCountInput: "",
     passengerCount: null,
     commissionPercentage: undefined,
     customerName: "",
@@ -157,7 +171,10 @@ export default function BookingsPage() {
   }, [selectedScheduleId]);
 
   useEffect(() => {
-    if (formData.companyId && !formData.commissionPercentage) {
+    if (
+      formData.companyId &&
+      (formData.commissionPercentage === undefined || formData.commissionPercentage === null)
+    ) {
       const company = companies.find((c) => c.id === formData.companyId);
       if (company) {
         setFormData((prev) => ({
@@ -249,6 +266,13 @@ export default function BookingsPage() {
       companyId: null,
       transport: false,
       numberOfPeople: 1,
+      numberOfPeopleInput: "",
+      adultCount: 0,
+      adultCountInput: "",
+      childCount: 0,
+      childCountInput: "",
+      seniorCount: 0,
+      seniorCountInput: "",
       passengerCount: null,
       commissionPercentage: undefined,
       customerName: "",
@@ -268,14 +292,21 @@ export default function BookingsPage() {
       setSelectedScheduleId(booking.activityScheduleId);
       setFormData({
         activityScheduleId: booking.activityScheduleId,
-        companyId: booking.companyId || null,
+        companyId: booking.companyId ?? null,
         transport: booking.transport,
         numberOfPeople: booking.numberOfPeople,
-        passengerCount: booking.passengerCount || null,
+        numberOfPeopleInput: booking.numberOfPeople,
+        adultCount: booking.adultCount ?? 0,
+        adultCountInput: booking.adultCount ?? 0,
+        childCount: booking.childCount ?? 0,
+        childCountInput: booking.childCount ?? 0,
+        seniorCount: booking.seniorCount ?? 0,
+        seniorCountInput: booking.seniorCount ?? 0,
+        passengerCount: booking.passengerCount ?? null,
         commissionPercentage: booking.commissionPercentage,
         customerName: booking.customerName,
-        customerEmail: booking.customerEmail || null,
-        customerPhone: booking.customerPhone || null,
+        customerEmail: booking.customerEmail ?? null,
+        customerPhone: booking.customerPhone ?? null,
         status: booking.status,
       });
       setShowBookingModal(true);
@@ -308,6 +339,16 @@ export default function BookingsPage() {
     }
   };
 
+  const parseCount = (v: string | number): number => {
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s === "") return 0;
+      const n = parseInt(s, 10);
+      return Number.isNaN(n) ? 0 : Math.max(0, n);
+    }
+    return Math.max(0, Number(v));
+  };
+
   const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -321,23 +362,42 @@ export default function BookingsPage() {
       return;
     }
 
-    if (!formData.customerEmail || !formData.customerEmail.trim()) {
-      toast.error("El email del cliente es requerido");
+    // Validar cantidad de personas: obligatorio y > 0
+    const numberOfPeopleValue =
+      typeof formData.numberOfPeopleInput === "string"
+        ? formData.numberOfPeopleInput.trim() === ""
+          ? null
+          : parseInt(formData.numberOfPeopleInput.trim(), 10)
+        : formData.numberOfPeopleInput;
+
+    if (numberOfPeopleValue === null || Number.isNaN(numberOfPeopleValue) || numberOfPeopleValue <= 0) {
+      toast.error("La cantidad de personas es requerida y debe ser mayor a 0");
       return;
     }
 
-    if (!formData.customerPhone || !formData.customerPhone.trim()) {
-      toast.error("El teléfono del cliente es requerido");
-      return;
-    }
-
-    if (formData.numberOfPeople <= 0) {
-      toast.error("La cantidad de personas debe ser mayor a 0");
-      return;
-    }
-
-    if (availabilityInfo && formData.numberOfPeople > availabilityInfo.availableSpaces) {
+    if (availabilityInfo && numberOfPeopleValue > availabilityInfo.availableSpaces) {
       toast.error(`No hay suficientes espacios disponibles. Disponibles: ${availabilityInfo.availableSpaces}`);
+      return;
+    }
+
+    const adultVal = parseCount(formData.adultCountInput);
+    const childVal = parseCount(formData.childCountInput);
+    const seniorVal = parseCount(formData.seniorCountInput);
+
+    if (adultVal < 0 || childVal < 0 || seniorVal < 0) {
+      toast.error("Adultos, niños y adultos mayores no pueden ser negativos");
+      return;
+    }
+
+    const sum = adultVal + childVal + seniorVal;
+    if (sum <= 0) {
+      toast.error("La suma de adultos + niños + adultos mayores debe ser mayor a 0");
+      return;
+    }
+    if (sum !== numberOfPeopleValue) {
+      toast.error(
+        `La suma de adultos + niños + adultos mayores (${sum}) debe ser igual a la cantidad de personas (${numberOfPeopleValue})`
+      );
       return;
     }
 
@@ -353,38 +413,40 @@ export default function BookingsPage() {
       }
     }
 
-    // Validar compañía (obligatoria)
-    if (!formData.companyId) {
-      toast.error("Debes seleccionar una compañía");
-      return;
-    }
-
-    // Validar comisión: debe estar definida (ya sea de compañía o manual) y puede ser 0 pero no vacía
-    const finalCommission =
-      formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
-        ? formData.commissionPercentage
-        : formData.companyId
-        ? companies.find((c) => c.id === formData.companyId)?.commissionPercentage
-        : undefined;
-
-    if (finalCommission === undefined || finalCommission === null) {
-      toast.error("Debes ingresar un porcentaje de comisión (puede ser 0)");
-      return;
-    }
-
-    if (finalCommission < 0 || finalCommission > 100) {
-      toast.error("El porcentaje de comisión debe estar entre 0 y 100");
-      return;
+    // Comisión: solo cuando hay compañía; puede ser 0
+    let finalCommission: number | undefined;
+    if (formData.companyId) {
+      finalCommission =
+        formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
+          ? formData.commissionPercentage
+          : companies.find((c) => c.id === formData.companyId)?.commissionPercentage;
+      if (finalCommission === undefined || finalCommission === null) {
+        toast.error("Debes ingresar un porcentaje de comisión para la compañía (puede ser 0)");
+        return;
+      }
+      if (finalCommission < 0 || finalCommission > 100) {
+        toast.error("El porcentaje de comisión debe estar entre 0 y 100");
+        return;
+      }
     }
 
     try {
       setFormLoading(true);
 
       const payload: BookingFormData = {
-        ...formData,
+        activityScheduleId: formData.activityScheduleId,
+        companyId: formData.companyId ?? null,
         transport: formData.transport || false,
+        numberOfPeople: numberOfPeopleValue,
+        adultCount: adultVal,
+        childCount: childVal,
+        seniorCount: seniorVal,
         passengerCount: formData.transport ? formData.passengerCount : null,
         commissionPercentage: finalCommission,
+        customerName: formData.customerName.trim(),
+        customerEmail: formData.customerEmail?.trim() || null,
+        customerPhone: formData.customerPhone?.trim() || null,
+        status: formData.status,
       };
 
       if (editingBooking) {
@@ -447,6 +509,14 @@ export default function BookingsPage() {
       width: "100px",
       align: "center",
       accessor: (b) => b.numberOfPeople,
+    },
+    {
+      key: "desglose",
+      header: "Desglose",
+      width: "140px",
+      align: "center",
+      accessor: (b) =>
+        `${b.adultCount ?? 0} A / ${b.childCount ?? 0} N / ${b.seniorCount ?? 0} M`,
     },
     {
       key: "companyName",
@@ -697,22 +767,29 @@ export default function BookingsPage() {
                 </div>
               )}
 
-              {/* Paso 3: Cantidad de Personas */}
+              {/* Paso 3: Cantidad de Personas y desglose */}
               <FormInput
                 label="Cantidad de Personas"
                 type="number"
                 min={1}
                 max={availabilityInfo?.availableSpaces || undefined}
-                value={formData.numberOfPeople || ""}
+                value={formData.numberOfPeopleInput}
                 onChange={(e) => {
-                  const newNumberOfPeople = e.target.value ? parseInt(e.target.value, 10) : 1;
+                  const inputValue = e.target.value === "" ? "" : e.target.value;
+                  const parsed = inputValue === "" ? null : parseInt(inputValue, 10);
+                  const total = parsed !== null && !Number.isNaN(parsed) && parsed >= 0 ? parsed : 0;
                   setFormData({
                     ...formData,
-                    numberOfPeople: newNumberOfPeople,
-                    // Si transport está activo y passengerCount está vacío o es menor, actualizarlo
-                    passengerCount: formData.transport && (!formData.passengerCount || formData.passengerCount < newNumberOfPeople)
-                      ? newNumberOfPeople
-                      : formData.passengerCount,
+                    numberOfPeopleInput: inputValue,
+                    adultCountInput: total,
+                    childCountInput: 0,
+                    seniorCountInput: 0,
+                    passengerCount:
+                      formData.transport &&
+                      total > 0 &&
+                      (!formData.passengerCount || formData.passengerCount < total)
+                        ? total
+                        : formData.passengerCount,
                   });
                 }}
                 required
@@ -720,10 +797,64 @@ export default function BookingsPage() {
                 disabled={formLoading || !availabilityInfo}
                 helperText={
                   availabilityInfo
-                    ? `Máximo ${availabilityInfo.availableSpaces} espacios disponibles`
+                    ? `Máximo ${availabilityInfo.availableSpaces} espacios disponibles. Desglose debe sumar esta cantidad.`
                     : "Selecciona una fecha primero"
                 }
               />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                <FormInput
+                  label="Adultos"
+                  type="number"
+                  min={0}
+                  value={formData.adultCountInput}
+                  onChange={(e) => {
+                    const v = e.target.value === "" ? "" : e.target.value;
+                    setFormData({ ...formData, adultCountInput: v });
+                  }}
+                  fullWidth
+                  disabled={formLoading || !availabilityInfo}
+                  placeholder="0"
+                />
+                <FormInput
+                  label="Niños"
+                  type="number"
+                  min={0}
+                  value={formData.childCountInput}
+                  onChange={(e) => {
+                    const v = e.target.value === "" ? "" : e.target.value;
+                    setFormData({ ...formData, childCountInput: v });
+                  }}
+                  fullWidth
+                  disabled={formLoading || !availabilityInfo}
+                  placeholder="0"
+                />
+                <FormInput
+                  label="Adultos mayores"
+                  type="number"
+                  min={0}
+                  value={formData.seniorCountInput}
+                  onChange={(e) => {
+                    const v = e.target.value === "" ? "" : e.target.value;
+                    setFormData({ ...formData, seniorCountInput: v });
+                  }}
+                  fullWidth
+                  disabled={formLoading || !availabilityInfo}
+                  placeholder="0"
+                />
+              </div>
+              {(formData.adultCountInput !== "" || formData.childCountInput !== "" || formData.seniorCountInput !== "") && (
+                <div style={{ fontSize: "0.875rem", color: "#64748b" }}>
+                  Suma actual:{" "}
+                  {parseCount(formData.adultCountInput) +
+                    parseCount(formData.childCountInput) +
+                    parseCount(formData.seniorCountInput)}
+                  {typeof formData.numberOfPeopleInput === "string" &&
+                  formData.numberOfPeopleInput.trim() !== "" &&
+                  !Number.isNaN(parseInt(formData.numberOfPeopleInput.trim(), 10))
+                    ? ` (debe ser ${parseInt(formData.numberOfPeopleInput.trim(), 10)})`
+                    : ""}
+                </div>
+              )}
 
               {/* Paso 4: Datos del Cliente */}
               <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
@@ -747,12 +878,12 @@ export default function BookingsPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      customerEmail: e.target.value || null,
+                      customerEmail: e.target.value.trim() || null,
                     })
                   }
-                  required
                   fullWidth
                   disabled={formLoading}
+                  placeholder="Opcional"
                 />
                 <FormInput
                   label="Teléfono"
@@ -760,12 +891,12 @@ export default function BookingsPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      customerPhone: e.target.value || null,
+                      customerPhone: e.target.value.trim() || null,
                     })
                   }
-                  required
                   fullWidth
                   disabled={formLoading}
+                  placeholder="Opcional"
                 />
               </div>
 
@@ -779,7 +910,16 @@ export default function BookingsPage() {
                     setFormData({
                       ...formData,
                       transport: needsTransport,
-                      passengerCount: needsTransport ? (formData.passengerCount || formData.numberOfPeople) : null,
+                      passengerCount: needsTransport
+                        ? formData.passengerCount ||
+                          (() => {
+                            const numValue =
+                              typeof formData.numberOfPeopleInput === "string"
+                                ? parseInt(formData.numberOfPeopleInput.trim(), 10)
+                                : formData.numberOfPeopleInput;
+                            return Number.isFinite(numValue) && numValue > 0 ? numValue : null;
+                          })()
+                        : null,
                     });
                   }}
                   disabled={formLoading}
@@ -807,10 +947,10 @@ export default function BookingsPage() {
                 )}
               </div>
 
-              {/* Paso 6: Comisión */}
+              {/* Paso 6: Comisión (solo cuando hay compañía) */}
               <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
                 <h4 style={{ marginBottom: "16px", fontSize: "1rem", fontWeight: 600 }}>
-                  Comisión
+                  Comisión (opcional)
                 </h4>
                 <FormCombobox
                   label="Compañía"
@@ -826,46 +966,37 @@ export default function BookingsPage() {
                     });
                   }}
                   options={companyOptions}
-                  placeholder="Selecciona una compañía"
+                  placeholder="Ninguna (opcional)"
                   searchPlaceholder="Buscar compañía..."
-                  required
                   fullWidth
                   disabled={formLoading}
                 />
-                <FormInput
-                  label="Porcentaje de Comisión (%)"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
-                  value={
-                    formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
-                      ? formData.commissionPercentage
-                      : formData.companyId
-                      ? companies.find((c) => c.id === formData.companyId)?.commissionPercentage || ""
-                      : ""
-                  }
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFormData({
-                      ...formData,
-                      commissionPercentage: value !== "" ? parseFloat(value) : undefined,
-                    });
-                  }}
-                  required
-                  fullWidth
-                  disabled={formLoading}
-                  placeholder={
-                    formData.companyId
-                      ? `Usará ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}% de la compañía`
-                      : "Ingresa el porcentaje de comisión"
-                  }
-                  helperText={
-                    formData.companyId
-                      ? "Puedes sobrescribir el porcentaje de la compañía ingresando un valor manual (puede ser 0)"
-                      : "Ingresa el porcentaje de comisión (puede ser 0)"
-                  }
-                />
+                {formData.companyId && (
+                  <FormInput
+                    label="Porcentaje de Comisión (%)"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.1"
+                    value={
+                      formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
+                        ? formData.commissionPercentage
+                        : companies.find((c) => c.id === formData.companyId)?.commissionPercentage ?? ""
+                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({
+                        ...formData,
+                        commissionPercentage: value !== "" ? parseFloat(value) : undefined,
+                      });
+                    }}
+                    required
+                    fullWidth
+                    disabled={formLoading}
+                    placeholder={`Default ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}%`}
+                    helperText="Puedes sobrescribir el porcentaje de la compañía (puede ser 0)"
+                  />
+                )}
               </div>
             </div>
 

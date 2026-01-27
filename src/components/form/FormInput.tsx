@@ -30,6 +30,9 @@ export function FormInput({
   id,
   required,
   disabled,
+  type,
+  value,
+  onChange,
   ...props
 }: FormInputProps) {
   const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
@@ -57,6 +60,46 @@ export function FormInput({
   };
 
   const [isFocused, setIsFocused] = React.useState(false);
+
+  // Manejar campos numéricos: permitir valores vacíos y borrar caracteres libremente
+  const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    
+    // Para campos numéricos, siempre pasar el valor como string al onChange
+    // Esto permite que el componente padre decida cómo manejarlo
+    // El input puede mostrar valores vacíos sin problemas
+    if (type === 'number') {
+      // Si está vacío, pasar string vacío
+      if (inputValue === '' || inputValue === '-' || inputValue === '+') {
+        const syntheticEvent = {
+          ...e,
+          target: {
+            ...e.target,
+            value: '',
+          },
+        } as React.ChangeEvent<HTMLInputElement>;
+        onChange?.(syntheticEvent);
+        return;
+      }
+      
+      // Permitir escribir números (incluyendo negativos y decimales mientras se escriben)
+      // Validamos que sea un formato numérico válido (puede estar incompleto como "12." o "-")
+      const numericRegex = /^-?\d*\.?\d*$/;
+      if (numericRegex.test(inputValue)) {
+        onChange?.(e);
+      }
+      // Si no coincide con el patrón numérico, no actualizar (mantener valor anterior)
+    } else {
+      // Para campos no numéricos, comportamiento normal
+      onChange?.(e);
+    }
+  };
+
+  // Convertir valor numérico a string para inputs de tipo number
+  // Esto permite que el campo pueda mostrarse vacío
+  const displayValue = type === 'number' 
+    ? (value === null || value === undefined || value === '' ? '' : String(value))
+    : value;
 
   return (
     <div style={{ marginBottom: '16px', width: fullWidth ? '100%' : 'auto' }}>
@@ -100,6 +143,9 @@ export function FormInput({
         <input
           {...props}
           id={inputId}
+          type={type}
+          value={displayValue}
+          onChange={type === 'number' ? handleNumericChange : onChange}
           className={className}
           style={{
             ...baseInputStyles,

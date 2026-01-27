@@ -289,11 +289,17 @@ export default function SchedulesPage() {
 
     // Validar que todos los timeSlots tengan datos
     for (const slot of bulkFormData.timeSlots) {
-      if (!slot.startTime || !slot.endTime || slot.capacity <= 0) {
-        toast.error("Todos los horarios deben tener hora de inicio, fin y capacidad mayor a 0");
+      if (!slot.startTime || !slot.endTime) {
+        toast.error("Todos los horarios deben tener hora de inicio y hora de fin");
         return;
       }
     }
+
+    // Asegurar que todos los timeSlots tengan capacity = 0 (se envía por defecto)
+    const timeSlotsWithCapacity = bulkFormData.timeSlots.map(slot => ({
+      ...slot,
+      capacity: 0,
+    }));
 
     // Validar formato de fechas
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -313,7 +319,7 @@ export default function SchedulesPage() {
         activityId: bulkFormData.activityId,
         startDate: bulkFormData.startDate,
         endDate: bulkFormData.endDate,
-        timeSlots: bulkFormData.timeSlots,
+        timeSlots: timeSlotsWithCapacity,
         validateOverlaps: true,
       };
 
@@ -852,7 +858,7 @@ export default function SchedulesPage() {
                 key={index}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr 120px auto",
+                  gridTemplateColumns: "1fr 1fr auto",
                   gap: "12px",
                   alignItems: "flex-end",
                   marginBottom: "12px",
@@ -876,15 +882,6 @@ export default function SchedulesPage() {
                   onChange={(e) => handleTimeSlotChange(index, "endTime", e.target.value)}
                   required
                   disabled={formLoading}
-                />
-                <FormInput
-                  label="Capacidad"
-                  type="number"
-                  value={slot.capacity}
-                  onChange={(e) => handleTimeSlotChange(index, "capacity", parseInt(e.target.value, 10) || 0)}
-                  required
-                  disabled={formLoading}
-                  min={1}
                 />
                 <Button
                   type="button"

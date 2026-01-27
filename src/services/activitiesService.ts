@@ -63,8 +63,14 @@ export async function listActivities(
   
   // Mapear la respuesta del API al formato PaginatedResponse
   if (data.items && Array.isArray(data.items)) {
+    const mapItem = (a: any) => ({
+      ...a,
+      adultPrice: a.adultPrice ?? a.adult_price ?? 0,
+      childPrice: a.childPrice ?? a.child_price ?? 0,
+      seniorPrice: a.seniorPrice ?? a.senior_price ?? 0,
+    });
     return {
-      items: data.items,
+      items: data.items.map(mapItem),
       total: data.pagination?.total || data.total || 0,
       page: data.pagination?.page || data.page || page,
       pageSize: data.pagination?.limit || data.limit || data.pageSize || limit,

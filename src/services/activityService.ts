@@ -21,6 +21,9 @@ function mapApiActivityToActivity(apiActivity: any): Activity {
     activityTypeId: apiActivity.activityTypeId || apiActivity.activity_type_id,
     title: apiActivity.title,
     partySize: apiActivity.partySize ?? apiActivity.party_size ?? 0,
+    adultPrice: apiActivity.adultPrice ?? apiActivity.adult_price ?? 0,
+    childPrice: apiActivity.childPrice ?? apiActivity.child_price ?? 0,
+    seniorPrice: apiActivity.seniorPrice ?? apiActivity.senior_price ?? 0,
     status: apiActivity.status ?? true,
     activityTypeName: apiActivity.activityTypeName || apiActivity.activity_type_name,
     schedulesCount: apiActivity.schedulesCount ?? apiActivity.schedules_count ?? 0,
@@ -99,6 +102,9 @@ export async function createActivity(payload: ActivityFormData): Promise<Activit
     activityTypeId: payload.activityTypeId,
     title: payload.title,
     partySize: payload.partySize,
+    adultPrice: payload.adultPrice,
+    childPrice: payload.childPrice,
+    seniorPrice: payload.seniorPrice,
     status: payload.status ?? true,
   };
 
@@ -115,6 +121,9 @@ export async function updateActivity(id: string, payload: Partial<ActivityFormDa
   if (payload.activityTypeId !== undefined) apiPayload.activityTypeId = payload.activityTypeId;
   if (payload.title !== undefined) apiPayload.title = payload.title;
   if (payload.partySize !== undefined) apiPayload.partySize = payload.partySize;
+  if (payload.adultPrice !== undefined) apiPayload.adultPrice = payload.adultPrice;
+  if (payload.childPrice !== undefined) apiPayload.childPrice = payload.childPrice;
+  if (payload.seniorPrice !== undefined) apiPayload.seniorPrice = payload.seniorPrice;
   if (payload.status !== undefined) apiPayload.status = payload.status;
 
   const { data } = await api.put<any>(`/api/activities/${id}`, apiPayload);

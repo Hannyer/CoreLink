@@ -54,10 +54,24 @@ export default function ActivitiesManagementPage() {
   // Estado para tipos de actividad
   const [activityTypes, setActivityTypes] = useState<SelectOption[]>([]);
 
-  const [formData, setFormData] = useState<ActivityFormData>({
+  const [formData, setFormData] = useState<
+    ActivityFormData & {
+      partySizeInput: string | number;
+      adultPriceInput: string | number;
+      childPriceInput: string | number;
+      seniorPriceInput: string | number;
+    }
+  >({
     activityTypeId: "",
     title: "",
     partySize: 0,
+    partySizeInput: "",
+    adultPrice: 0,
+    adultPriceInput: "",
+    childPrice: 0,
+    childPriceInput: "",
+    seniorPrice: 0,
+    seniorPriceInput: "",
     status: true,
   });
 
@@ -97,6 +111,13 @@ export default function ActivitiesManagementPage() {
       activityTypeId: "",
       title: "",
       partySize: 0,
+      partySizeInput: "",
+      adultPrice: 0,
+      adultPriceInput: "",
+      childPrice: 0,
+      childPriceInput: "",
+      seniorPrice: 0,
+      seniorPriceInput: "",
       status: true,
     });
     setShowActivityModal(true);
@@ -108,6 +129,13 @@ export default function ActivitiesManagementPage() {
       activityTypeId: activity.activityTypeId,
       title: activity.title,
       partySize: activity.partySize,
+      partySizeInput: activity.partySize,
+      adultPrice: activity.adultPrice,
+      adultPriceInput: activity.adultPrice,
+      childPrice: activity.childPrice,
+      childPriceInput: activity.childPrice,
+      seniorPrice: activity.seniorPrice,
+      seniorPriceInput: activity.seniorPrice,
       status: activity.status,
     });
     setShowActivityModal(true);
@@ -140,6 +168,16 @@ export default function ActivitiesManagementPage() {
     }
   };
 
+  const parseNum = (v: string | number): number | null => {
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s === "") return null;
+      const n = parseFloat(s);
+      return Number.isNaN(n) ? null : n;
+    }
+    return v;
+  };
+
   const handleSubmitActivity = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -153,19 +191,48 @@ export default function ActivitiesManagementPage() {
       return;
     }
 
-    if (formData.partySize <= 0) {
-      toast.error("El tamaño del grupo debe ser mayor a 0");
+    const partySizeVal = parseNum(formData.partySizeInput);
+    if (partySizeVal === null || partySizeVal <= 0) {
+      toast.error("El tamaño del grupo es requerido y debe ser mayor a 0");
+      return;
+    }
+
+    const adultPriceVal = parseNum(formData.adultPriceInput);
+    if (adultPriceVal === null || adultPriceVal <= 0) {
+      toast.error("Precio adulto es requerido y debe ser mayor a 0");
+      return;
+    }
+
+    const childPriceVal = parseNum(formData.childPriceInput);
+    if (childPriceVal === null || childPriceVal <= 0) {
+      toast.error("Precio niño es requerido y debe ser mayor a 0");
+      return;
+    }
+
+    const seniorPriceVal = parseNum(formData.seniorPriceInput);
+    if (seniorPriceVal === null || seniorPriceVal <= 0) {
+      toast.error("Precio adulto mayor es requerido y debe ser mayor a 0");
       return;
     }
 
     try {
       setFormLoading(true);
 
+      const payload: ActivityFormData = {
+        activityTypeId: formData.activityTypeId,
+        title: formData.title.trim(),
+        partySize: partySizeVal,
+        adultPrice: adultPriceVal,
+        childPrice: childPriceVal,
+        seniorPrice: seniorPriceVal,
+        status: formData.status ?? true,
+      };
+
       if (editingActivity) {
-        await updateActivity(editingActivity.id, formData);
+        await updateActivity(editingActivity.id, payload);
         toast.success("Actividad actualizada correctamente");
       } else {
-        await createActivity(formData);
+        await createActivity(payload);
         toast.success("Actividad creada correctamente");
       }
 
@@ -178,6 +245,9 @@ export default function ActivitiesManagementPage() {
       setFormLoading(false);
     }
   };
+
+  const formatPrice = (n: number) =>
+    Number.isFinite(n) ? n.toFixed(2) : "-";
 
   const columns: Column<Activity>[] = [
     { key: "title", header: "Título", accessor: (a) => a.title },
@@ -192,6 +262,27 @@ export default function ActivitiesManagementPage() {
       width: "140px",
       align: "center",
       accessor: (a) => a.partySize,
+    },
+    {
+      key: "adultPrice",
+      header: "Precio Adulto",
+      width: "120px",
+      align: "right",
+      accessor: (a) => formatPrice(a.adultPrice),
+    },
+    {
+      key: "childPrice",
+      header: "Precio Niño",
+      width: "120px",
+      align: "right",
+      accessor: (a) => formatPrice(a.childPrice),
+    },
+    {
+      key: "seniorPrice",
+      header: "Precio Adulto Mayor",
+      width: "140px",
+      align: "right",
+      accessor: (a) => formatPrice(a.seniorPrice),
     },
     {
       key: "status",
@@ -308,17 +399,71 @@ export default function ActivitiesManagementPage() {
           <FormInput
             label="Tamaño del Grupo"
             type="number"
-            value={formData.partySize || ""}
+            value={formData.partySizeInput}
             onChange={(e) =>
               setFormData({
                 ...formData,
-                partySize: e.target.value ? parseInt(e.target.value) : 0,
+                partySizeInput: e.target.value === "" ? "" : e.target.value,
               })
             }
             min={1}
             required
             fullWidth
             disabled={formLoading}
+          />
+
+          <FormInput
+            label="Precio Adulto"
+            type="number"
+            step="0.01"
+            min={0.01}
+            value={formData.adultPriceInput}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                adultPriceInput: e.target.value === "" ? "" : e.target.value,
+              })
+            }
+            required
+            fullWidth
+            disabled={formLoading}
+            placeholder="Ej: 50.00"
+          />
+
+          <FormInput
+            label="Precio Niño"
+            type="number"
+            step="0.01"
+            min={0.01}
+            value={formData.childPriceInput}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                childPriceInput: e.target.value === "" ? "" : e.target.value,
+              })
+            }
+            required
+            fullWidth
+            disabled={formLoading}
+            placeholder="Ej: 25.00"
+          />
+
+          <FormInput
+            label="Precio Adulto Mayor"
+            type="number"
+            step="0.01"
+            min={0.01}
+            value={formData.seniorPriceInput}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                seniorPriceInput: e.target.value === "" ? "" : e.target.value,
+              })
+            }
+            required
+            fullWidth
+            disabled={formLoading}
+            placeholder="Ej: 40.00"
           />
 
           <FormCheckbox

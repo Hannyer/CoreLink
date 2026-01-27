@@ -51,9 +51,10 @@ export default function CompaniesPage() {
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState<boolean | null>(null);
 
-  const [formData, setFormData] = useState<CompanyFormData>({
+  const [formData, setFormData] = useState<CompanyFormData & { commissionPercentageInput: string | number }>({
     name: "",
     commissionPercentage: 0,
+    commissionPercentageInput: "",
     status: true,
   });
 
@@ -81,6 +82,7 @@ export default function CompaniesPage() {
     setFormData({
       name: "",
       commissionPercentage: 0,
+      commissionPercentageInput: "",
       status: true,
     });
     setShowCompanyModal(true);
@@ -91,6 +93,7 @@ export default function CompaniesPage() {
     setFormData({
       name: company.name,
       commissionPercentage: company.commissionPercentage,
+      commissionPercentageInput: company.commissionPercentage,
       status: company.status,
     });
     setShowCompanyModal(true);
@@ -142,7 +145,17 @@ export default function CompaniesPage() {
       return;
     }
 
-    if (formData.commissionPercentage < 0 || formData.commissionPercentage > 100) {
+    // Validar porcentaje de comisión: debe tener un valor y estar entre 0 y 100
+    const commissionValue = typeof formData.commissionPercentageInput === 'string' 
+      ? (formData.commissionPercentageInput.trim() === '' ? null : parseFloat(formData.commissionPercentageInput.trim()))
+      : formData.commissionPercentageInput;
+
+    if (commissionValue === null || isNaN(commissionValue)) {
+      toast.error("El porcentaje de comisión es requerido");
+      return;
+    }
+
+    if (commissionValue < 0 || commissionValue > 100) {
       toast.error("El porcentaje de comisión debe estar entre 0 y 100");
       return;
     }
@@ -150,11 +163,17 @@ export default function CompaniesPage() {
     try {
       setFormLoading(true);
 
+      const payload: CompanyFormData = {
+        name: formData.name.trim(),
+        commissionPercentage: commissionValue,
+        status: formData.status,
+      };
+
       if (editingCompany) {
-        await updateCompany(editingCompany.id, formData);
+        await updateCompany(editingCompany.id, payload);
         toast.success("Compañía actualizada correctamente");
       } else {
-        await createCompany(formData);
+        await createCompany(payload);
         toast.success("Compañía creada correctamente");
       }
 
@@ -319,11 +338,11 @@ export default function CompaniesPage() {
             min={0}
             max={100}
             step="0.1"
-            value={formData.commissionPercentage || ""}
+            value={formData.commissionPercentageInput}
             onChange={(e) =>
               setFormData({
                 ...formData,
-                commissionPercentage: e.target.value ? parseFloat(e.target.value) : 0,
+                commissionPercentageInput: e.target.value === '' ? '' : e.target.value,
               })
             }
             required

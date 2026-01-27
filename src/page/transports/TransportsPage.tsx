@@ -46,9 +46,10 @@ export default function TransportsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const [formData, setFormData] = useState<TransportFormData>({
+  const [formData, setFormData] = useState<TransportFormData & { capacityInput: string | number }>({
     model: "",
     capacity: 1,
+    capacityInput: "",
     operationalStatus: true,
     status: true,
   });
@@ -77,6 +78,7 @@ export default function TransportsPage() {
     setFormData({
       model: "",
       capacity: 1,
+      capacityInput: "",
       operationalStatus: true,
       status: true,
     });
@@ -88,6 +90,7 @@ export default function TransportsPage() {
     setFormData({
       model: transport.model,
       capacity: transport.capacity,
+      capacityInput: transport.capacity,
       operationalStatus: transport.operationalStatus,
       status: transport.status,
     });
@@ -131,8 +134,13 @@ export default function TransportsPage() {
       return;
     }
 
-    if (!formData.capacity || formData.capacity < 1) {
-      toast.error("La capacidad debe ser mayor a 0");
+    // Validar capacidad: debe tener un valor y ser mayor que 0
+    const capacityValue = typeof formData.capacityInput === 'string' 
+      ? (formData.capacityInput.trim() === '' ? null : parseInt(formData.capacityInput.trim(), 10))
+      : formData.capacityInput;
+
+    if (capacityValue === null || isNaN(capacityValue) || capacityValue < 1) {
+      toast.error("La capacidad es requerida y debe ser mayor a 0");
       return;
     }
 
@@ -141,7 +149,7 @@ export default function TransportsPage() {
       
       const payload: TransportFormData = {
         model: formData.model.trim(),
-        capacity: formData.capacity,
+        capacity: capacityValue,
         operationalStatus: formData.operationalStatus,
         status: formData.status,
       };
@@ -279,11 +287,11 @@ export default function TransportsPage() {
           <FormInput
             label="Capacidad"
             type="number"
-            value={formData.capacity}
+            value={formData.capacityInput}
             onChange={(e) =>
               setFormData({
                 ...formData,
-                capacity: e.target.value ? parseInt(e.target.value) : 1,
+                capacityInput: e.target.value === '' ? '' : e.target.value,
               })
             }
             min={1}

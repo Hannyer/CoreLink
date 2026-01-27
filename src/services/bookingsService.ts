@@ -15,26 +15,28 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
   return {
     id: apiBooking.id,
     activityScheduleId: apiBooking.activityScheduleId || apiBooking.activity_schedule_id,
-    companyId: apiBooking.companyId || apiBooking.company_id || null,
+    companyId: apiBooking.companyId ?? apiBooking.company_id ?? null,
     transport: apiBooking.transport ?? false,
-    numberOfPeople: apiBooking.numberOfPeople || apiBooking.number_of_people || 0,
+    numberOfPeople: apiBooking.numberOfPeople ?? apiBooking.number_of_people ?? 0,
+    adultCount: apiBooking.adultCount ?? apiBooking.adult_count ?? 0,
+    childCount: apiBooking.childCount ?? apiBooking.child_count ?? 0,
+    seniorCount: apiBooking.seniorCount ?? apiBooking.senior_count ?? 0,
     passengerCount: apiBooking.passengerCount !== undefined ? apiBooking.passengerCount : (apiBooking.passenger_count !== undefined ? apiBooking.passenger_count : null),
-    commissionPercentage: apiBooking.commissionPercentage || apiBooking.commission_percentage || 0,
-    customerName: apiBooking.customerName || apiBooking.customer_name,
-    customerEmail: apiBooking.customerEmail || apiBooking.customer_email || null,
-    customerPhone: apiBooking.customerPhone || apiBooking.customer_phone || null,
-    status: apiBooking.status || 'pending',
+    commissionPercentage: apiBooking.commissionPercentage ?? apiBooking.commission_percentage ?? 0,
+    customerName: apiBooking.customerName || apiBooking.customer_name || "",
+    customerEmail: apiBooking.customerEmail ?? apiBooking.customer_email ?? null,
+    customerPhone: apiBooking.customerPhone ?? apiBooking.customer_phone ?? null,
+    status: apiBooking.status || "pending",
     createdAt: apiBooking.createdAt || apiBooking.created_at,
     updatedAt: apiBooking.updatedAt || apiBooking.updated_at,
-    createdBy: apiBooking.createdBy || apiBooking.created_by,
-    // Campos adicionales
+    createdBy: apiBooking.createdBy ?? apiBooking.created_by,
     activityTitle: apiBooking.activityTitle || apiBooking.activity_title,
     scheduledStart: apiBooking.scheduledStart || apiBooking.scheduled_start,
     scheduledEnd: apiBooking.scheduledEnd || apiBooking.scheduled_end,
-    companyName: apiBooking.companyName || apiBooking.company_name || null,
+    companyName: apiBooking.companyName ?? apiBooking.company_name ?? null,
     activityId: apiBooking.activityId || apiBooking.activity_id,
-    activityPartySize: apiBooking.activityPartySize || apiBooking.activity_party_size,
-    companyCommissionPercentage: apiBooking.companyCommissionPercentage || apiBooking.company_commission_percentage || null,
+    activityPartySize: apiBooking.activityPartySize ?? apiBooking.activity_party_size,
+    companyCommissionPercentage: apiBooking.companyCommissionPercentage ?? apiBooking.company_commission_percentage ?? null,
   };
 }
 
@@ -141,18 +143,19 @@ export async function createBooking(payload: BookingFormData): Promise<Booking> 
   const apiPayload: any = {
     activityScheduleId: payload.activityScheduleId,
     numberOfPeople: payload.numberOfPeople,
+    adultCount: payload.adultCount ?? 0,
+    childCount: payload.childCount ?? 0,
+    seniorCount: payload.seniorCount ?? 0,
     customerName: payload.customerName,
     transport: payload.transport ?? false,
+    status: payload.status ?? "pending",
   };
 
-  if (payload.companyId) apiPayload.companyId = payload.companyId;
-  if (payload.transport && payload.passengerCount !== undefined) {
-    apiPayload.passengerCount = payload.passengerCount;
-  }
-  if (payload.commissionPercentage !== undefined) apiPayload.commissionPercentage = payload.commissionPercentage;
-  if (payload.customerEmail) apiPayload.customerEmail = payload.customerEmail;
-  if (payload.customerPhone) apiPayload.customerPhone = payload.customerPhone;
-  if (payload.status) apiPayload.status = payload.status;
+  if (payload.companyId != null) apiPayload.companyId = payload.companyId;
+  if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
+  if (payload.commissionPercentage != null) apiPayload.commissionPercentage = payload.commissionPercentage;
+  if (payload.customerEmail != null && payload.customerEmail !== "") apiPayload.customerEmail = payload.customerEmail;
+  if (payload.customerPhone != null && payload.customerPhone !== "") apiPayload.customerPhone = payload.customerPhone;
 
   const { data } = await api.post<any>("/api/bookings", apiPayload);
   return mapApiBookingToBooking(data);
@@ -167,12 +170,12 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
   if (payload.activityScheduleId !== undefined) apiPayload.activityScheduleId = payload.activityScheduleId;
   if (payload.companyId !== undefined) apiPayload.companyId = payload.companyId;
   if (payload.transport !== undefined) apiPayload.transport = payload.transport;
-  if (payload.transport && payload.passengerCount !== undefined) {
-    apiPayload.passengerCount = payload.passengerCount;
-  } else if (payload.transport === false) {
-    apiPayload.passengerCount = null;
-  }
+  if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
+  else if (payload.transport === false) apiPayload.passengerCount = null;
   if (payload.numberOfPeople !== undefined) apiPayload.numberOfPeople = payload.numberOfPeople;
+  if (payload.adultCount !== undefined) apiPayload.adultCount = payload.adultCount;
+  if (payload.childCount !== undefined) apiPayload.childCount = payload.childCount;
+  if (payload.seniorCount !== undefined) apiPayload.seniorCount = payload.seniorCount;
   if (payload.commissionPercentage !== undefined) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.customerName !== undefined) apiPayload.customerName = payload.customerName;
   if (payload.customerEmail !== undefined) apiPayload.customerEmail = payload.customerEmail;

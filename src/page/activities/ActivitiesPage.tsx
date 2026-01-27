@@ -33,6 +33,10 @@ type ActivityFormState = {
   activityTypeId: string;
   title: string;
   partySize: number;
+  partySizeInput: string | number;
+  adultPriceInput: string | number;
+  childPriceInput: string | number;
+  seniorPriceInput: string | number;
   status: boolean;
 };
 
@@ -40,6 +44,10 @@ const DEFAULT_FORM_STATE: ActivityFormState = {
   activityTypeId: "",
   title: "",
   partySize: 1,
+  partySizeInput: "",
+  adultPriceInput: "",
+  childPriceInput: "",
+  seniorPriceInput: "",
   status: true,
 };
 
@@ -51,6 +59,9 @@ function mapByDateToRow(item: ActivityByDate): ActivityRow {
     activityTypeName: item.activityTypeName,
     title: item.title,
     partySize: item.partySize,
+    adultPrice: item.adultPrice ?? 0,
+    childPrice: item.childPrice ?? 0,
+    seniorPrice: item.seniorPrice ?? 0,
     status: item.status,
     start: item.start,
     end: item.end,
@@ -187,6 +198,10 @@ export default function ActivitiesPage() {
         activityTypeId: data.activityTypeId,
         title: data.title,
         partySize: data.partySize,
+        partySizeInput: data.partySize,
+        adultPriceInput: data.adultPrice ?? "",
+        childPriceInput: data.childPrice ?? "",
+        seniorPriceInput: data.seniorPrice ?? "",
         status: data.status ?? true,
       });
     } catch (err) {
@@ -244,8 +259,41 @@ export default function ActivitiesPage() {
       return;
     }
 
-    if (!Number.isFinite(formState.partySize) || formState.partySize < 1) {
-      toast.error("La cantidad de personas debe ser mayor a 0");
+    // Validar partySize: debe tener un valor y ser mayor que 0
+    const partySizeValue = typeof formState.partySizeInput === 'string' 
+      ? (formState.partySizeInput.trim() === '' ? null : parseInt(formState.partySizeInput.trim(), 10))
+      : formState.partySizeInput;
+
+    if (partySizeValue === null || isNaN(partySizeValue) || partySizeValue < 1) {
+      toast.error("La cantidad de personas es requerida y debe ser mayor a 0");
+      return;
+    }
+
+    const parsePrice = (v: string | number): number | null => {
+      if (typeof v === "string") {
+        const s = v.trim();
+        if (s === "") return null;
+        const n = parseFloat(s);
+        return Number.isNaN(n) ? null : n;
+      }
+      return v;
+    };
+
+    const adultPriceVal = parsePrice(formState.adultPriceInput);
+    if (adultPriceVal === null || adultPriceVal <= 0) {
+      toast.error("Precio adulto es requerido y debe ser mayor a 0");
+      return;
+    }
+
+    const childPriceVal = parsePrice(formState.childPriceInput);
+    if (childPriceVal === null || childPriceVal <= 0) {
+      toast.error("Precio niño es requerido y debe ser mayor a 0");
+      return;
+    }
+
+    const seniorPriceVal = parsePrice(formState.seniorPriceInput);
+    if (seniorPriceVal === null || seniorPriceVal <= 0) {
+      toast.error("Precio adulto mayor es requerido y debe ser mayor a 0");
       return;
     }
 
@@ -256,7 +304,10 @@ export default function ActivitiesPage() {
         const updatePayload: ActivityUpdateRequest = {
           activityTypeId: formState.activityTypeId,
           title: formState.title.trim(),
-          partySize: formState.partySize,
+          partySize: partySizeValue,
+          adultPrice: adultPriceVal,
+          childPrice: childPriceVal,
+          seniorPrice: seniorPriceVal,
           status: formState.status,
         };
 
@@ -266,7 +317,10 @@ export default function ActivitiesPage() {
         const createPayload: ActivityCreateRequest = {
           activityTypeId: formState.activityTypeId,
           title: formState.title.trim(),
-          partySize: formState.partySize,
+          partySize: partySizeValue,
+          adultPrice: adultPriceVal,
+          childPrice: childPriceVal,
+          seniorPrice: seniorPriceVal,
           status: formState.status,
         };
 
@@ -285,6 +339,8 @@ export default function ActivitiesPage() {
     }
   }
 
+  const formatPrice = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : "-");
+
   const columns: Column<ActivityRow>[] = [
     {
       key: "title",
@@ -302,6 +358,27 @@ export default function ActivitiesPage() {
       width: "120px",
       align: "center",
       accessor: (row) => row.partySize,
+    },
+    {
+      key: "adultPrice",
+      header: "Precio Adulto",
+      width: "120px",
+      align: "right",
+      accessor: (row) => row.adultPrice,
+    },
+    {
+      key: "childPrice",
+      header: "Precio Niño",
+      width: "120px",
+      align: "right",
+      accessor: (row) => row.childPrice,
+    },
+    {
+      key: "seniorPrice",
+      header: "Precio Adulto Mayor",
+      width: "140px",
+      align: "right",
+      accessor: (row) => row.seniorPrice,
     },
     {
       key: "status",
@@ -451,14 +528,70 @@ export default function ActivitiesPage() {
                 label="Personas"
                 type="number"
                 min={1}
-                value={formState.partySize}
+                value={formState.partySizeInput}
                 onChange={(event) => {
-                  const value = event.target.value ? parseInt(event.target.value, 10) : 1;
-                  setFormState((prev) => ({ ...prev, partySize: Number.isNaN(value) ? 1 : value }));
+                  setFormState((prev) => ({ 
+                    ...prev, 
+                    partySizeInput: event.target.value === '' ? '' : event.target.value 
+                  }));
                 }}
                 required
                 disabled={formLoading}
                 fullWidth
+              />
+
+              <FormInput
+                label="Precio Adulto"
+                type="number"
+                step="0.01"
+                min={0.01}
+                value={formState.adultPriceInput}
+                onChange={(e) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    adultPriceInput: e.target.value === "" ? "" : e.target.value,
+                  }))
+                }
+                required
+                fullWidth
+                disabled={formLoading}
+                placeholder="Ej: 50.00"
+              />
+
+              <FormInput
+                label="Precio Niño"
+                type="number"
+                step="0.01"
+                min={0.01}
+                value={formState.childPriceInput}
+                onChange={(e) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    childPriceInput: e.target.value === "" ? "" : e.target.value,
+                  }))
+                }
+                required
+                fullWidth
+                disabled={formLoading}
+                placeholder="Ej: 25.00"
+              />
+
+              <FormInput
+                label="Precio Adulto Mayor"
+                type="number"
+                step="0.01"
+                min={0.01}
+                value={formState.seniorPriceInput}
+                onChange={(e) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    seniorPriceInput: e.target.value === "" ? "" : e.target.value,
+                  }))
+                }
+                required
+                fullWidth
+                disabled={formLoading}
+                placeholder="Ej: 40.00"
               />
 
               <FormCheckbox

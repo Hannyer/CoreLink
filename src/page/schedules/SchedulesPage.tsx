@@ -667,10 +667,7 @@ export default function SchedulesPage() {
             </>
           )}
           <Button onClick={handleBulkCreate} icon={<Calendar size={18} />} size="sm" variant="primary">
-            Inserción Masiva
-          </Button>
-          <Button onClick={handleCreateSchedule} icon={<Plus size={18} />} size="sm">
-            Nueva planeación
+          Nueva planeación
           </Button>
         </>
       )}

@@ -9,6 +9,8 @@ import {
   cancelBooking,
   getBookingById,
 } from "@/services/bookingsService";
+import { fetchPaymentTypesWithPagination } from "@/services/paymentTypesService";
+import { fetchCardTypesWithPagination } from "@/services/cardTypesService";
 import { fetchActivitiesWithPagination } from "@/services/activityService";
 import { fetchCompaniesWithPagination } from "@/services/companiesService";
 import { Pagination } from "@/components/ui/Pagination";
@@ -28,11 +30,20 @@ import type {
   Company,
   AvailableSchedule,
   AvailabilityInfo,
+  PaymentType,
+  CardType,
 } from "@/types/entities";
 import type { AxiosError } from "axios";
 
 /**
  * Función helper para extraer el mensaje de error del formato del API
+ *
+ * Cambios recientes en esta página:
+ * - Se agregó soporte para seleccionar tipo de pago (`paymentTypeId`) y tipo de tarjeta (`cardTypeId`)
+ *   consumiendo los catálogos `/api/payment-types` y `/api/card-types`.
+ * - Cuando el tipo de pago es "Tarjeta", el tipo de tarjeta es obligatorio antes de crear/actualizar la reserva.
+ * - El payload enviado al endpoint POST/PUT `/api/bookings` ahora incluye `paymentTypeId`, `cardTypeId` (cuando aplica)
+ *   y un comentario opcional (`comment`).
  */
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string; title?: string }>;
@@ -74,6 +85,8 @@ export default function BookingsPage() {
   // Catálogos
   const [activities, setActivities] = useState<Activity[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [paymentTypes, setPaymentTypes] = useState<PaymentType[]>([]);
+  const [cardTypes, setCardTypes] = useState<CardType[]>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(false);
 
   const [formData, setFormData] = useState<
@@ -86,6 +99,8 @@ export default function BookingsPage() {
   >({
     activityScheduleId: "",
     companyId: null,
+    paymentTypeId: null,
+    cardTypeId: null,
     transport: false,
     numberOfPeople: 1,
     numberOfPeopleInput: "",
@@ -100,6 +115,7 @@ export default function BookingsPage() {
     customerName: "",
     customerEmail: null,
     customerPhone: null,
+    comment: "",
     status: "pending",
   });
 
@@ -132,6 +148,28 @@ export default function BookingsPage() {
           label: `${company.name} (${company.commissionPercentage}%)`,
         })),
     [companies]
+  );
+
+  const paymentTypeOptions: SelectOption[] = useMemo(
+    () =>
+      paymentTypes
+        .filter((p) => p.status)
+        .map((paymentType) => ({
+          value: paymentType.id,
+          label: paymentType.name,
+        })),
+    [paymentTypes]
+  );
+
+  const cardTypeOptions: SelectOption[] = useMemo(
+    () =>
+      cardTypes
+        .filter((c) => c.status)
+        .map((cardType) => ({
+          value: cardType.id,
+          label: cardType.name,
+        })),
+    [cardTypes]
   );
 
   const scheduleOptions: SelectOption[] = useMemo(
@@ -194,12 +232,16 @@ export default function BookingsPage() {
   const loadCatalogs = async () => {
     try {
       setCatalogsLoading(true);
-      const [activitiesRes, companiesRes] = await Promise.all([
+      const [activitiesRes, companiesRes, paymentTypesRes, cardTypesRes] = await Promise.all([
         fetchActivitiesWithPagination(1, 100, true),
         fetchCompaniesWithPagination(1, 100, true),
+        fetchPaymentTypesWithPagination(1, 50),
+        fetchCardTypesWithPagination(1, 50),
       ]);
       setActivities(activitiesRes.items);
       setCompanies(companiesRes.items);
+      setPaymentTypes(paymentTypesRes.items);
+      setCardTypes(cardTypesRes.items);
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
       toast.error(getErrorMessage(error));
@@ -277,6 +319,8 @@ export default function BookingsPage() {
     setFormData({
       activityScheduleId: "",
       companyId: null,
+      paymentTypeId: null,
+      cardTypeId: null,
       transport: false,
       numberOfPeople: 1,
       numberOfPeopleInput: "",
@@ -291,6 +335,7 @@ export default function BookingsPage() {
       customerName: "",
       customerEmail: null,
       customerPhone: null,
+      comment: "",
       status: "pending",
     });
     setShowBookingModal(true);
@@ -314,6 +359,8 @@ export default function BookingsPage() {
       setFormData({
         activityScheduleId: booking.activityScheduleId,
         companyId: booking.companyId ?? null,
+        paymentTypeId: booking.paymentTypeId ?? null,
+        cardTypeId: booking.cardTypeId ?? null,
         transport: booking.transport,
         numberOfPeople: booking.numberOfPeople,
         numberOfPeopleInput: booking.numberOfPeople,
@@ -328,6 +375,7 @@ export default function BookingsPage() {
         customerName: booking.customerName,
         customerEmail: booking.customerEmail ?? null,
         customerPhone: booking.customerPhone ?? null,
+        comment: booking.comment ?? "",
         status: booking.status,
       });
       setShowBookingModal(true);
@@ -389,6 +437,20 @@ export default function BookingsPage() {
 
     if (!formData.activityScheduleId) {
       toast.error("Debes seleccionar una fecha");
+      return;
+    }
+
+    if (!formData.paymentTypeId) {
+      toast.error("Debes seleccionar un tipo de pago");
+      return;
+    }
+
+    const selectedPaymentType = paymentTypes.find((p) => p.id === formData.paymentTypeId);
+    const isCardPayment =
+      selectedPaymentType && selectedPaymentType.name.toLowerCase() === "tarjeta";
+
+    if (isCardPayment && !formData.cardTypeId) {
+      toast.error("Debes seleccionar un tipo de tarjeta");
       return;
     }
 
@@ -471,6 +533,8 @@ export default function BookingsPage() {
       const payload: BookingFormData = {
         activityScheduleId: formData.activityScheduleId,
         companyId: formData.companyId ?? null,
+        paymentTypeId: formData.paymentTypeId ?? null,
+        cardTypeId: isCardPayment ? formData.cardTypeId ?? null : null,
         transport: formData.transport || false,
         numberOfPeople: numberOfPeopleValue,
         adultCount: adultVal,
@@ -481,6 +545,7 @@ export default function BookingsPage() {
         customerName: formData.customerName.trim(),
         customerEmail: formData.customerEmail?.trim() || null,
         customerPhone: formData.customerPhone?.trim() || null,
+        comment: formData.comment?.trim() || null,
         status: formData.status,
       };
 
@@ -1052,6 +1117,73 @@ export default function BookingsPage() {
               </div>
 
               {/* Paso 5: Transporte */}
+              {/* Paso 5: Datos de Pago */}
+              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
+                <h4 style={{ marginBottom: "16px", fontSize: "1rem", fontWeight: 600 }}>
+                  Datos de Pago
+                </h4>
+                <FormCombobox
+                  label="Tipo de Pago"
+                  value={formData.paymentTypeId || ""}
+                  onChange={(value) => {
+                    const paymentTypeId = value ? String(value) : null;
+                    setFormData({
+                      ...formData,
+                      paymentTypeId,
+                      cardTypeId: null,
+                    });
+                  }}
+                  options={paymentTypeOptions}
+                  placeholder="Selecciona un tipo de pago"
+                  searchPlaceholder="Buscar tipo de pago..."
+                  required
+                  fullWidth
+                  disabled={formLoading}
+                />
+                {(() => {
+                  const selectedPaymentType = paymentTypes.find(
+                    (p) => p.id === formData.paymentTypeId
+                  );
+                  const isCard =
+                    selectedPaymentType &&
+                    selectedPaymentType.name.toLowerCase() === "tarjeta";
+                  if (!isCard) return null;
+                  return (
+                    <FormCombobox
+                      label="Tipo de Tarjeta"
+                      value={formData.cardTypeId || ""}
+                      onChange={(value) => {
+                        const cardTypeId = value ? String(value) : null;
+                        setFormData({
+                          ...formData,
+                          cardTypeId,
+                        });
+                      }}
+                      options={cardTypeOptions}
+                      placeholder="Selecciona un tipo de tarjeta"
+                      searchPlaceholder="Buscar tipo de tarjeta..."
+                      required
+                      fullWidth
+                      disabled={formLoading}
+                    />
+                  );
+                })()}
+                <FormInput
+                  label="Comentario"
+                  value={formData.comment || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      comment: e.target.value,
+                    })
+                  }
+                  fullWidth
+                  disabled={formLoading}
+                  placeholder="Opcional"
+                />
+              </div>
+
+              {/* Paso 6: Transporte */}
               <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
                 <FormCheckbox
                   label="Requiere Transporte"
@@ -1098,7 +1230,7 @@ export default function BookingsPage() {
                 )}
               </div>
 
-              {/* Paso 6: Comisión (solo cuando hay compañía) */}
+              {/* Paso 7: Comisión (solo cuando hay compañía) */}
               <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
                 <h4 style={{ marginBottom: "16px", fontSize: "1rem", fontWeight: 600 }}>
                   Comisión (opcional)

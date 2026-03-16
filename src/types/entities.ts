@@ -482,6 +482,22 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+export interface PaymentType {
+  id: string;
+  name: string;
+  status: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CardType {
+  id: string;
+  name: string;
+  status: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ApiError {
   message: string;
   code?: string;
@@ -519,6 +535,8 @@ export interface Booking {
   id: string;
   activityScheduleId: string;
   companyId?: string | null;
+  paymentTypeId?: string | null;
+  cardTypeId?: string | null;
   transport: boolean;
   numberOfPeople: number;
   adultCount: number;
@@ -529,6 +547,7 @@ export interface Booking {
   customerName: string;
   customerEmail?: string | null;
   customerPhone?: string | null;
+  comment?: string | null;
   status: BookingStatus;
   createdAt: string;
   updatedAt: string;
@@ -547,6 +566,8 @@ export interface BookingFormData {
   activityScheduleId: string;
   companyId?: string | null;
   transport?: boolean;
+  paymentTypeId?: string | null;
+  cardTypeId?: string | null;
   numberOfPeople: number;
   adultCount: number;
   childCount: number;
@@ -556,6 +577,7 @@ export interface BookingFormData {
   customerName: string;
   customerEmail?: string | null;
   customerPhone?: string | null;
+  comment?: string | null;
   status?: BookingStatus;
 }
 

@@ -16,6 +16,8 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
     id: apiBooking.id,
     activityScheduleId: apiBooking.activityScheduleId || apiBooking.activity_schedule_id,
     companyId: apiBooking.companyId ?? apiBooking.company_id ?? null,
+    paymentTypeId: apiBooking.paymentTypeId ?? apiBooking.payment_type_id ?? null,
+    cardTypeId: apiBooking.cardTypeId ?? apiBooking.card_type_id ?? null,
     transport: apiBooking.transport ?? false,
     numberOfPeople: apiBooking.numberOfPeople ?? apiBooking.number_of_people ?? 0,
     adultCount: apiBooking.adultCount ?? apiBooking.adult_count ?? 0,
@@ -26,6 +28,7 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
     customerName: apiBooking.customerName || apiBooking.customer_name || "",
     customerEmail: apiBooking.customerEmail ?? apiBooking.customer_email ?? null,
     customerPhone: apiBooking.customerPhone ?? apiBooking.customer_phone ?? null,
+    comment: apiBooking.comment ?? null,
     status: apiBooking.status || "pending",
     createdAt: apiBooking.createdAt || apiBooking.created_at,
     updatedAt: apiBooking.updatedAt || apiBooking.updated_at,
@@ -145,6 +148,7 @@ export async function getBookingById(id: string): Promise<Booking> {
 export async function createBooking(payload: BookingFormData): Promise<Booking> {
   const apiPayload: any = {
     activityScheduleId: payload.activityScheduleId,
+    paymentTypeId: payload.paymentTypeId,
     numberOfPeople: payload.numberOfPeople,
     adultCount: payload.adultCount ?? 0,
     childCount: payload.childCount ?? 0,
@@ -155,10 +159,12 @@ export async function createBooking(payload: BookingFormData): Promise<Booking> 
   };
 
   if (payload.companyId != null) apiPayload.companyId = payload.companyId;
+  if (payload.cardTypeId != null) apiPayload.cardTypeId = payload.cardTypeId;
   if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
   if (payload.commissionPercentage != null) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.customerEmail != null && payload.customerEmail !== "") apiPayload.customerEmail = payload.customerEmail;
   if (payload.customerPhone != null && payload.customerPhone !== "") apiPayload.customerPhone = payload.customerPhone;
+  if (payload.comment != null && payload.comment !== "") apiPayload.comment = payload.comment;
 
   const { data } = await api.post<any>("/api/bookings", apiPayload);
   return mapApiBookingToBooking(data);
@@ -172,6 +178,8 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
 
   if (payload.activityScheduleId !== undefined) apiPayload.activityScheduleId = payload.activityScheduleId;
   if (payload.companyId !== undefined) apiPayload.companyId = payload.companyId;
+  if (payload.paymentTypeId !== undefined) apiPayload.paymentTypeId = payload.paymentTypeId;
+  if (payload.cardTypeId !== undefined) apiPayload.cardTypeId = payload.cardTypeId;
   if (payload.transport !== undefined) apiPayload.transport = payload.transport;
   if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
   else if (payload.transport === false) apiPayload.passengerCount = null;
@@ -183,6 +191,7 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
   if (payload.customerName !== undefined) apiPayload.customerName = payload.customerName;
   if (payload.customerEmail !== undefined) apiPayload.customerEmail = payload.customerEmail;
   if (payload.customerPhone !== undefined) apiPayload.customerPhone = payload.customerPhone;
+  if (payload.comment !== undefined) apiPayload.comment = payload.comment;
   if (payload.status !== undefined) apiPayload.status = payload.status;
 
   const { data } = await api.put<any>(`/api/bookings/${id}`, apiPayload);

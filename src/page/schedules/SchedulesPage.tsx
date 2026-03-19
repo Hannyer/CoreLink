@@ -569,45 +569,7 @@ export default function SchedulesPage() {
           {row.status ? "Activa" : "Inactiva"}
         </span>
       ),
-    },
-    {
-      key: "actions",
-      header: "Acciones",
-      width: "220px",
-      align: "center",
-      render: (row) => (
-        <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleAddAttendees(row)}
-            icon={<Users size={16} />}
-            style={{ padding: "4px 8px" }}
-            title="Agregar asistentes"
-          >
-            +Asistentes
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEditSchedule(row)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-          >
-            Editar
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDeleteSchedule(row.id)}
-            icon={<Trash2 size={16} />}
-            style={{ padding: "4px 8px" }}
-          >
-            Eliminar
-          </Button>
-        </div>
-      ),
-    },
+    }
   ];
 
   const headerExtra = (

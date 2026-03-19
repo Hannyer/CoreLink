@@ -616,12 +616,14 @@ export default function BookingsPage() {
       header: "Desglose",
       width: "140px",
       align: "center",
+      hideOnMobile: true,
       accessor: (b) =>
         `${b.adultCount ?? 0} A / ${b.childCount ?? 0} N / ${b.seniorCount ?? 0} M`,
     },
     {
       key: "companyName",
       header: "Compañía",
+      hideOnMobile: true,
       accessor: (b) => b.companyName || "-",
     },
     {
@@ -629,6 +631,7 @@ export default function BookingsPage() {
       header: "Transporte",
       width: "120px",
       align: "center",
+      hideOnMobile: true,
       render: (b) => (
         <span
           style={{
@@ -645,6 +648,7 @@ export default function BookingsPage() {
       header: "Comisión (%)",
       width: "120px",
       align: "center",
+      hideOnMobile: true,
       accessor: (b) => `${b.commissionPercentage}%`,
     },
     {
@@ -667,9 +671,7 @@ export default function BookingsPage() {
             onClick={() => handleEditBooking(b.id)}
             icon={<Edit size={16} />}
             style={{ padding: "4px 8px" }}
-          >
-            Editar
-          </Button>
+          />
           {b.status !== "cancelled" && (
             <Button
               variant="danger"
@@ -677,58 +679,40 @@ export default function BookingsPage() {
               onClick={() => handleCancelBooking(b.id)}
               icon={<X size={16} />}
               style={{ padding: "4px 8px" }}
-            >
-              Cancelar
-            </Button>
+            />
           )}
         </div>
       ),
     },
   ];
 
+  const statusOptions: SelectOption[] = useMemo(
+    () => [
+      { value: "", label: "Todas" },
+      { value: "pending", label: "Pendientes" },
+      { value: "confirmed", label: "Confirmadas" },
+      { value: "cancelled", label: "Canceladas" },
+    ],
+    []
+  );
+
   const headerExtra = (
-    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <Button
-          variant={statusFilter === null ? "primary" : "outline"}
-          size="sm"
-          onClick={() => {
-            setStatusFilter(null);
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+      <div style={{ minWidth: "220px", flex: 1 }}>
+        <FormCombobox
+          label="Estado"
+          value={statusFilter ?? ""}
+          onChange={(value) => {
+            const v = String(value ?? "");
+            setStatusFilter(v ? (v as BookingStatus) : null);
             setPage(1);
           }}
-        >
-          Todas
-        </Button>
-        <Button
-          variant={statusFilter === "pending" ? "primary" : "outline"}
-          size="sm"
-          onClick={() => {
-            setStatusFilter("pending");
-            setPage(1);
-          }}
-        >
-          Pendientes
-        </Button>
-        <Button
-          variant={statusFilter === "confirmed" ? "primary" : "outline"}
-          size="sm"
-          onClick={() => {
-            setStatusFilter("confirmed");
-            setPage(1);
-          }}
-        >
-          Confirmadas
-        </Button>
-        <Button
-          variant={statusFilter === "cancelled" ? "primary" : "outline"}
-          size="sm"
-          onClick={() => {
-            setStatusFilter("cancelled");
-            setPage(1);
-          }}
-        >
-          Canceladas
-        </Button>
+          options={statusOptions}
+          placeholder="Todas"
+          searchPlaceholder="Buscar estado..."
+          fullWidth
+          disabled={loading}
+        />
       </div>
       <Button onClick={handleCreateBooking} icon={<Plus size={18} />} size="sm">
         Nueva reserva
@@ -855,7 +839,13 @@ export default function BookingsPage() {
                       }}
                     >
                       <div style={{ fontWeight: 600, marginBottom: "8px" }}>Precios por persona:</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                          gap: "8px",
+                        }}
+                      >
                         {selectedSchedule.adultPrice !== undefined && (
                           <div>
                             <span style={{ color: "#64748b" }}>Adultos:</span>{" "}
@@ -945,7 +935,13 @@ export default function BookingsPage() {
                     : "Selecciona una fecha primero"
                 }
               />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "12px",
+                }}
+              >
                 <div>
                   <FormInput
                     label="Adultos"
@@ -1288,6 +1284,7 @@ export default function BookingsPage() {
                 display: "flex",
                 gap: "12px",
                 justifyContent: "flex-end",
+                flexWrap: "wrap",
                 marginTop: "24px",
               }}
             >

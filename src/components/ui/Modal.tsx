@@ -2,7 +2,7 @@ import React, { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'fullscreen';
 
 interface ModalProps {
   isOpen: boolean;
@@ -14,6 +14,10 @@ interface ModalProps {
   closeOnBackdropClick?: boolean;
   footer?: ReactNode;
   className?: string;
+  /** Estilos del panel blanco (ancho fijo, minHeight, etc.) */
+  panelStyle?: React.CSSProperties;
+  /** Estilos del cuerpo con scroll */
+  bodyStyle?: React.CSSProperties;
 }
 
 const sizeStyles: Record<ModalSize, React.CSSProperties> = {
@@ -21,6 +25,7 @@ const sizeStyles: Record<ModalSize, React.CSSProperties> = {
   md: { maxWidth: '600px' },
   lg: { maxWidth: '800px' },
   xl: { maxWidth: '1200px' },
+  '2xl': { maxWidth: '1360px' },
   fullscreen: { maxWidth: '100%', width: '100%', height: '100%', margin: 0, borderRadius: 0 },
 };
 
@@ -34,6 +39,8 @@ export function Modal({
   closeOnBackdropClick = true,
   footer,
   className = '',
+  panelStyle,
+  bodyStyle,
 }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
@@ -89,6 +96,7 @@ export function Modal({
           boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
           animation: 'slideUp 0.3s ease-out',
           ...sizeStyles[size],
+          ...panelStyle,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -143,6 +151,8 @@ export function Modal({
             padding: '24px',
             overflowY: 'auto',
             color: '#1e293b',
+            minHeight: 0,
+            ...bodyStyle,
           }}
         >
           {children}

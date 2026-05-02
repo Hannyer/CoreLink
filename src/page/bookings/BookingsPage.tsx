@@ -451,7 +451,7 @@ export default function BookingsPage() {
   /** Al editar, el API cuenta esta reserva como ocupada: se suman sus plazas al cupo usable. */
   const maxParticipantsAllowed = useMemo(() => {
     if (!availabilityInfo) return undefined;
-    return availabilityInfo.availableSpaces + (editingBooking?.numberOfPeople ?? 0);
+    return availabilityInfo.availableSpaces;
   }, [availabilityInfo, editingBooking]);
 
   const validateWizardStep0 = (): string | null => {
@@ -478,10 +478,12 @@ export default function BookingsPage() {
     }
 
     /* Crear: tope = cupos libres. Editar: tope = participantes originales + cupos libres (sin cambio de total siempre pasa). */
+    const valor= editingBooking?editingBooking.numberOfPeople:0;
+    const valueFieldsAvaleible= numberOfPeopleValue-valor
     if (
       availabilityInfo &&
       maxParticipantsAllowed !== undefined &&
-      numberOfPeopleValue > maxParticipantsAllowed
+    valueFieldsAvaleible > maxParticipantsAllowed
     ) {
       return editingBooking
         ? `No hay suficientes cupos. Puedes tener hasta ${maxParticipantsAllowed} participante(s) (${editingBooking.numberOfPeople} de tu reserva + ${availabilityInfo.availableSpaces} cupo(s) libre(s) en la actividad).`
@@ -1313,7 +1315,7 @@ export default function BookingsPage() {
                     availabilityInfo && maxParticipantsAllowed !== undefined
                       ? `Máx. ${maxParticipantsAllowed}${
                           editingBooking
-                            ? " (cupos libres + plazas de esta reserva)"
+                            ? " (cupos libres)"
                             : ""
                         }. La suma por categoría debe coincidir.`
                       : "Elige fecha primero"
@@ -1323,7 +1325,7 @@ export default function BookingsPage() {
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    gap: "10px",
+                    gap: "10px", 
                   }}
                 >
                   <div>

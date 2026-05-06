@@ -8,6 +8,7 @@ import {
   updateBooking,
   cancelBooking,
   getBookingById,
+  getBookingConfigurationById,
 } from "@/services/bookingsService";
 import { fetchPaymentTypesWithPagination } from "@/services/paymentTypesService";
 import { fetchCardTypesWithPagination } from "@/services/cardTypesService";
@@ -70,6 +71,8 @@ function getErrorMessage(error: unknown): string {
 
 /** Pasos del asistente de reserva: 0 actividad → 1 participantes → 2 cliente/pago → 3 resumen */
 const BOOKING_WIZARD_LAST_STEP = 3;
+const BOOKING_IVA_CONFIGURATION_ID =
+  import.meta.env.VITE_BOOKING_IVA_CONFIG_ID || "615ba8af-0687-4cc1-88b4-30c076b30496";
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -101,6 +104,7 @@ export default function BookingsPage() {
   const [paymentTypes, setPaymentTypes] = useState<PaymentType[]>([]);
   const [cardTypes, setCardTypes] = useState<CardType[]>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(false);
+  const [ivaPercentage, setIvaPercentage] = useState(0);
 
   const [formData, setFormData] = useState<
     BookingFormData & {
@@ -108,6 +112,7 @@ export default function BookingsPage() {
       adultCountInput: string | number;
       childCountInput: string | number;
       seniorCountInput: string | number;
+      exonerateTax: boolean;
     }
   >({
     activityScheduleId: "",
@@ -129,6 +134,7 @@ export default function BookingsPage() {
     customerEmail: null,
     customerPhone: null,
     comment: "",
+    exonerateTax: false,
     status: "pending",
   });
 
@@ -198,6 +204,10 @@ export default function BookingsPage() {
 
   useEffect(() => {
     loadCatalogs();
+  }, []);
+
+  useEffect(() => {
+    loadTaxConfiguration();
   }, []);
 
   useEffect(() => {
@@ -280,6 +290,18 @@ export default function BookingsPage() {
     }
   };
 
+  const loadTaxConfiguration = async () => {
+    try {
+      const config = await getBookingConfigurationById(BOOKING_IVA_CONFIGURATION_ID);
+      const parsed = parseFloat(String(config.value ?? "0"));
+      setIvaPercentage(Number.isNaN(parsed) ? 0 : parsed);
+    } catch (error) {
+      console.error("Error al cargar configuración de IVA:", error);
+      toast.error("No se pudo cargar la configuración de IVA. Se usará 0% temporalmente.");
+      setIvaPercentage(0);
+    }
+  };
+
   const loadAvailableSchedules = async () => {
     if (!selectedActivityId) {
       setAvailableSchedules([]);
@@ -350,6 +372,7 @@ export default function BookingsPage() {
       customerEmail: null,
       customerPhone: null,
       comment: "",
+      exonerateTax: false,
       status: "pending",
     });
     setBookingWizardStep(0);
@@ -391,6 +414,7 @@ export default function BookingsPage() {
         customerEmail: booking.customerEmail ?? null,
         customerPhone: booking.customerPhone ?? null,
         comment: booking.comment ?? "",
+        exonerateTax: false,
         status: booking.status,
       });
       setBookingWizardStep(0);
@@ -680,6 +704,42 @@ export default function BookingsPage() {
     formData.childCountInput,
     formData.seniorCountInput,
   ]);
+
+  const effectiveCommissionPercentage = useMemo(() => {
+    if (!formData.companyId) return 0;
+    const configured =
+      formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
+        ? formData.commissionPercentage
+        : companies.find((c) => c.id === formData.companyId)?.commissionPercentage ?? 0;
+    const normalized = Number(configured);
+    if (Number.isNaN(normalized)) return 0;
+    return Math.min(100, Math.max(0, normalized));
+  }, [formData.companyId, formData.commissionPercentage, companies]);
+
+  const bookingEstimatedCommissionAmount = useMemo(() => {
+    if (!formData.companyId) return 0;
+    return bookingEstimatedTotal * (effectiveCommissionPercentage / 100);
+  }, [bookingEstimatedTotal, effectiveCommissionPercentage, formData.companyId]);
+
+  const bookingEstimatedTaxableBase = useMemo(
+    () => Math.max(0, bookingEstimatedTotal - bookingEstimatedCommissionAmount),
+    [bookingEstimatedTotal, bookingEstimatedCommissionAmount]
+  );
+
+  const bookingEstimatedTaxAmount = useMemo(() => {
+    if (formData.exonerateTax) return 0;
+    return bookingEstimatedTaxableBase * (ivaPercentage / 100);
+  }, [bookingEstimatedTaxableBase, ivaPercentage, formData.exonerateTax]);
+
+  const bookingEstimatedTaxExoneratedAmount = useMemo(
+    () => bookingEstimatedTaxableBase * (ivaPercentage / 100),
+    [bookingEstimatedTaxableBase, ivaPercentage]
+  );
+
+  const bookingEstimatedGrandTotal = useMemo(
+    () => bookingEstimatedTotal + bookingEstimatedTaxAmount,
+    [bookingEstimatedTotal, bookingEstimatedTaxAmount]
+  );
 
   const bookingWizardStepsMeta = useMemo(
     () =>
@@ -1447,16 +1507,51 @@ export default function BookingsPage() {
                       Total estimado
                     </span>
                     <span style={{ fontWeight: 700, fontSize: "1rem", color: "#0369a1" }}>
-                      $
-                      {(
-                        parseCount(formData.adultCountInput) *
-                          parsePrice(selectedSchedule.adultPrice) +
-                        parseCount(formData.childCountInput) *
-                          parsePrice(selectedSchedule.childPrice) +
-                        parseCount(formData.seniorCountInput) *
-                          parsePrice(selectedSchedule.seniorPrice)
-                      ).toFixed(2)}
+                      ${bookingEstimatedGrandTotal.toFixed(2)}
                     </span>
+                  </div>
+                )}
+                {selectedSchedule && (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px dashed #cbd5e1",
+                      borderRadius: "8px",
+                      background: "#fff",
+                      display: "grid",
+                      gap: "6px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
+                      <span style={{ color: "#64748b" }}>Subtotal</span>
+                      <strong>${bookingEstimatedTotal.toFixed(2)}</strong>
+                    </div>
+                    {formData.companyId && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
+                        <span style={{ color: "#64748b" }}>
+                          Comisión ({effectiveCommissionPercentage.toFixed(2)}%)
+                        </span>
+                        <strong>-${bookingEstimatedCommissionAmount.toFixed(2)}</strong>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
+                      <span style={{ color: "#64748b" }}>Base imponible</span>
+                      <strong>${bookingEstimatedTaxableBase.toFixed(2)}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
+                      <span style={{ color: "#64748b" }}>IVA ({ivaPercentage.toFixed(2)}%)</span>
+                      <strong>${bookingEstimatedTaxAmount.toFixed(2)}</strong>
+                    </div>
+                    {formData.exonerateTax && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#0f766e" }}>
+                        <span>Exoneración aplicada</span>
+                        <strong>-${bookingEstimatedTaxExoneratedAmount.toFixed(2)}</strong>
+                      </div>
+                    )}
+                    <div style={{ borderTop: "1px solid #e2e8f0", marginTop: "4px", paddingTop: "6px", display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontWeight: 700 }}>Total final</span>
+                      <strong style={{ fontSize: "1rem" }}>${bookingEstimatedGrandTotal.toFixed(2)}</strong>
+                    </div>
                   </div>
                 )}
                 {(formData.adultCountInput !== "" ||
@@ -1863,8 +1958,57 @@ export default function BookingsPage() {
                       >
                         <span style={{ fontWeight: 600, color: "#0369a1" }}>Total estimado</span>
                         <span style={{ fontWeight: 800, fontSize: "1.125rem", color: "#0369a1" }}>
-                          ${bookingEstimatedTotal.toFixed(2)}
+                          ${bookingEstimatedGrandTotal.toFixed(2)}
                         </span>
+                      </div>
+                    )}
+                    {selectedSchedule && (
+                      <div style={{ marginTop: "8px", display: "grid", gap: "4px", fontSize: "0.8125rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "#64748b" }}>Subtotal</span>
+                          <span>${bookingEstimatedTotal.toFixed(2)}</span>
+                        </div>
+                        {formData.companyId && (
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ color: "#64748b" }}>
+                              Comisión ({effectiveCommissionPercentage.toFixed(2)}%)
+                            </span>
+                            <span>-${bookingEstimatedCommissionAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "#64748b" }}>Base imponible</span>
+                          <span>${bookingEstimatedTaxableBase.toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "#64748b" }}>IVA ({ivaPercentage.toFixed(2)}%)</span>
+                          <span>${bookingEstimatedTaxAmount.toFixed(2)}</span>
+                        </div>
+                        {formData.exonerateTax && (
+                          <div style={{ display: "flex", justifyContent: "space-between", color: "#0f766e" }}>
+                            <span>IVA exonerado</span>
+                            <span>-${bookingEstimatedTaxExoneratedAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #e2e8f0", paddingTop: "4px", fontWeight: 700 }}>
+                          <span>Total final</span>
+                          <span>${bookingEstimatedGrandTotal.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedSchedule && (
+                      <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid #e2e8f0" }}>
+                        <FormCheckbox
+                          label={`Exonerar impuesto (IVA ${ivaPercentage.toFixed(2)}%)`}
+                          checked={formData.exonerateTax}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              exonerateTax: e.target.checked,
+                            })
+                          }
+                          disabled={formLoading}
+                        />
                       </div>
                     )}
                   </div>
@@ -1906,6 +2050,10 @@ export default function BookingsPage() {
                           return cn ? ` · ${cn}` : "";
                         })()}
                       </span>
+                    </div>
+                    <div style={{ ...summaryRowStyle, borderBottom: "none" }}>
+                      <span style={{ color: "#64748b" }}>Impuesto</span>
+                      <span>{formData.exonerateTax ? "Exonerado" : `IVA ${ivaPercentage.toFixed(2)}%`}</span>
                     </div>
                     {formData.comment?.trim() ? (
                       <div style={{ marginTop: "8px", fontSize: "0.8125rem", color: "#475569" }}>

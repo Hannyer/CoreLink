@@ -8,6 +8,23 @@ import type {
   PaginatedResponse,
 } from "@/types/entities";
 
+export type BookingConfiguration = {
+  id: string;
+  key01?: string;
+  key02?: string;
+  key03?: string;
+  key04?: string;
+  key05?: string;
+  key06?: string;
+  value: string | number | null;
+  description?: string | null;
+  observation?: string | null;
+  displayName?: string | null;
+  status?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 /**
  * Función auxiliar para mapear la respuesta del API al formato del frontend
  */
@@ -62,6 +79,9 @@ export async function getAvailableSchedulesByActivityId(activityId: string): Pro
       : (item.available_spaces !== undefined 
           ? item.available_spaces 
           : Math.max(0, partySize - bookedPeople));
+
+    const capacity = item.capacity ?? item.partySize ?? item.party_size ?? partySize ?? 0;
+    const bookedCount = item.bookedCount ?? item.booked_count ?? bookedPeople;
     
     return {
       id: item.id,
@@ -70,6 +90,8 @@ export async function getAvailableSchedulesByActivityId(activityId: string): Pro
       scheduledEnd: item.scheduledEnd || item.scheduled_end,
       status: item.status ?? true,
       activityTitle: item.activityTitle || item.activity_title,
+      capacity,
+      bookedCount,
       partySize,
       bookedPeople,
       availableSpaces,
@@ -204,5 +226,30 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
 export async function cancelBooking(id: string): Promise<Booking> {
   const { data } = await api.put<any>(`/api/bookings/${id}/cancel`);
   return mapApiBookingToBooking(data);
+}
+
+/**
+ * Obtiene una configuración de bookings por ID (endpoint GET /api/bookings/configurations/{id})
+ */
+export async function getBookingConfigurationById(
+  configId: string
+): Promise<BookingConfiguration> {
+  const { data } = await api.get<any>(`/api/bookings/configurations/${configId}`);
+  return {
+    id: data.id,
+    key01: data.key01,
+    key02: data.key02,
+    key03: data.key03,
+    key04: data.key04,
+    key05: data.key05,
+    key06: data.key06,
+    value: data.value,
+    description: data.description ?? null,
+    observation: data.observation ?? null,
+    displayName: data.displayName ?? null,
+    status: data.status ?? true,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  };
 }
 

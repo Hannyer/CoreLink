@@ -73,6 +73,7 @@ function getErrorMessage(error: unknown): string {
 const BOOKING_WIZARD_LAST_STEP = 3;
 const BOOKING_IVA_CONFIGURATION_ID =
   import.meta.env.VITE_BOOKING_IVA_CONFIG_ID || "615ba8af-0687-4cc1-88b4-30c076b30496";
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -379,10 +380,22 @@ export default function BookingsPage() {
     setShowBookingModal(true);
   };
 
-  const handleEditBooking = async (id: string) => {
+  const canModifyBooking = (scheduledStart?: string | null): boolean => {
+    if (!scheduledStart) return true;
+    const startMs = new Date(scheduledStart).getTime();
+    if (Number.isNaN(startMs)) return true;
+    return startMs - Date.now() >= ONE_HOUR_MS;
+  };
+
+  const handleEditBooking = async (bookingRow: Booking) => {
+    if (!canModifyBooking(bookingRow.scheduledStart)) {
+      toast.error("No se puede modificar: falta menos de 1 hora para la fecha/hora de la reserva.");
+      return;
+    }
+
     try {
       setFormLoading(true);
-      const booking = await getBookingById(id);
+      const booking = await getBookingById(bookingRow.id);
       setEditingBooking(booking);
       setSelectedActivityId(booking.activityId || "");
       setSelectedScheduleId(booking.activityScheduleId);
@@ -390,6 +403,8 @@ export default function BookingsPage() {
       // Cargar schedules para obtener los precios
       if (booking.activityId) {
         const schedules = await getAvailableSchedulesByActivityId(booking.activityId);
+        // Refrescar el dropdown de fechas al abrir edición con datos actualizados
+        setAvailableSchedules(schedules);
         const schedule = schedules.find((s) => s.id === booking.activityScheduleId);
         setSelectedSchedule(schedule || null);
       }
@@ -427,7 +442,12 @@ export default function BookingsPage() {
     }
   };
 
-  const handleCancelBooking = async (id: string) => {
+  const handleCancelBooking = async (bookingRow: Booking) => {
+    if (!canModifyBooking(bookingRow.scheduledStart)) {
+      toast.error("No se puede modificar: falta menos de 1 hora para la fecha/hora de la reserva.");
+      return;
+    }
+
     const confirmed = await confirm({
       title: "Cancelar Reserva",
       message: "¿Estás seguro de que deseas cancelar esta reserva?",
@@ -438,7 +458,7 @@ export default function BookingsPage() {
 
     if (confirmed) {
       try {
-        await cancelBooking(id);
+        await cancelBooking(bookingRow.id);
         toast.success("Reserva cancelada correctamente");
         await loadBookings();
       } catch (error) {
@@ -639,6 +659,10 @@ export default function BookingsPage() {
           : companies.find((c) => c.id === formData.companyId)?.commissionPercentage;
     }
 
+    // Reservado para persistencia futura del monto de comisión en BD.
+    const commissionAmountForPersistence = bookingEstimatedCommissionAmount;
+    void commissionAmountForPersistence;
+
     try {
       setFormLoading(true);
 
@@ -721,10 +745,7 @@ export default function BookingsPage() {
     return bookingEstimatedTotal * (effectiveCommissionPercentage / 100);
   }, [bookingEstimatedTotal, effectiveCommissionPercentage, formData.companyId]);
 
-  const bookingEstimatedTaxableBase = useMemo(
-    () => Math.max(0, bookingEstimatedTotal - bookingEstimatedCommissionAmount),
-    [bookingEstimatedTotal, bookingEstimatedCommissionAmount]
-  );
+  const bookingEstimatedTaxableBase = useMemo(() => Math.max(0, bookingEstimatedTotal), [bookingEstimatedTotal]);
 
   const bookingEstimatedTaxAmount = useMemo(() => {
     if (formData.exonerateTax) return 0;
@@ -906,17 +927,29 @@ export default function BookingsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleEditBooking(b.id)}
+            onClick={() => handleEditBooking(b)}
             icon={<Edit size={16} />}
             style={{ padding: "4px 8px" }}
+            disabled={!canModifyBooking(b.scheduledStart)}
+            title={
+              !canModifyBooking(b.scheduledStart)
+                ? "No editable: falta menos de 1 hora"
+                : "Editar"
+            }
           />
           {b.status !== "cancelled" && (
             <Button
               variant="danger"
               size="sm"
-              onClick={() => handleCancelBooking(b.id)}
+              onClick={() => handleCancelBooking(b)}
               icon={<X size={16} />}
               style={{ padding: "4px 8px" }}
+              disabled={!canModifyBooking(b.scheduledStart)}
+              title={
+                !canModifyBooking(b.scheduledStart)
+                  ? "No modificable: falta menos de 1 hora"
+                  : "Cancelar reserva"
+              }
             />
           )}
         </div>
@@ -1526,18 +1559,6 @@ export default function BookingsPage() {
                       <span style={{ color: "#64748b" }}>Subtotal</span>
                       <strong>${bookingEstimatedTotal.toFixed(2)}</strong>
                     </div>
-                    {formData.companyId && (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
-                        <span style={{ color: "#64748b" }}>
-                          Comisión ({effectiveCommissionPercentage.toFixed(2)}%)
-                        </span>
-                        <strong>-${bookingEstimatedCommissionAmount.toFixed(2)}</strong>
-                      </div>
-                    )}
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
-                      <span style={{ color: "#64748b" }}>Base imponible</span>
-                      <strong>${bookingEstimatedTaxableBase.toFixed(2)}</strong>
-                    </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
                       <span style={{ color: "#64748b" }}>IVA ({ivaPercentage.toFixed(2)}%)</span>
                       <strong>${bookingEstimatedTaxAmount.toFixed(2)}</strong>
@@ -1967,18 +1988,6 @@ export default function BookingsPage() {
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
                           <span style={{ color: "#64748b" }}>Subtotal</span>
                           <span>${bookingEstimatedTotal.toFixed(2)}</span>
-                        </div>
-                        {formData.companyId && (
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ color: "#64748b" }}>
-                              Comisión ({effectiveCommissionPercentage.toFixed(2)}%)
-                            </span>
-                            <span>-${bookingEstimatedCommissionAmount.toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "#64748b" }}>Base imponible</span>
-                          <span>${bookingEstimatedTaxableBase.toFixed(2)}</span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
                           <span style={{ color: "#64748b" }}>IVA ({ivaPercentage.toFixed(2)}%)</span>

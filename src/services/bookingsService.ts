@@ -29,6 +29,8 @@ export type BookingConfiguration = {
  * Función auxiliar para mapear la respuesta del API al formato del frontend
  */
 function mapApiBookingToBooking(apiBooking: any): Booking {
+  const vatRaw = apiBooking.vatAmount ?? apiBooking.vat_amount;
+  const commissionRaw = apiBooking.commissionAmount ?? apiBooking.commission_amount;
   return {
     id: apiBooking.id,
     activityScheduleId: apiBooking.activityScheduleId || apiBooking.activity_schedule_id,
@@ -42,6 +44,12 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
     seniorCount: apiBooking.seniorCount ?? apiBooking.senior_count ?? 0,
     passengerCount: apiBooking.passengerCount !== undefined ? apiBooking.passengerCount : (apiBooking.passenger_count !== undefined ? apiBooking.passenger_count : null),
     commissionPercentage: apiBooking.commissionPercentage ?? apiBooking.commission_percentage ?? 0,
+    subtotal: apiBooking.subtotal != null && apiBooking.subtotal !== "" ? Number(apiBooking.subtotal) : null,
+    vatAmount: vatRaw != null && vatRaw !== "" ? Number(vatRaw) : null,
+    total: apiBooking.total != null && apiBooking.total !== "" ? Number(apiBooking.total) : null,
+    exempt: apiBooking.exempt ?? false,
+    commissionAmount:
+      commissionRaw != null && commissionRaw !== "" ? Number(commissionRaw) : null,
     customerName: apiBooking.customerName || apiBooking.customer_name || "",
     customerEmail: apiBooking.customerEmail ?? apiBooking.customer_email ?? null,
     customerPhone: apiBooking.customerPhone ?? apiBooking.customer_phone ?? null,
@@ -184,6 +192,11 @@ export async function createBooking(payload: BookingFormData): Promise<Booking> 
   if (payload.cardTypeId != null) apiPayload.cardTypeId = payload.cardTypeId;
   if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
   if (payload.commissionPercentage != null) apiPayload.commissionPercentage = payload.commissionPercentage;
+  if (payload.subtotal !== undefined) apiPayload.subtotal = payload.subtotal;
+  if (payload.vatAmount !== undefined) apiPayload.vatAmount = payload.vatAmount;
+  if (payload.total !== undefined) apiPayload.total = payload.total;
+  if (payload.exempt !== undefined) apiPayload.exempt = payload.exempt;
+  if (payload.commissionAmount !== undefined) apiPayload.commissionAmount = payload.commissionAmount;
   if (payload.customerEmail != null && payload.customerEmail !== "") apiPayload.customerEmail = payload.customerEmail;
   if (payload.customerPhone != null && payload.customerPhone !== "") apiPayload.customerPhone = payload.customerPhone;
   if (payload.comment != null && payload.comment !== "") apiPayload.comment = payload.comment;
@@ -210,6 +223,11 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
   if (payload.childCount !== undefined) apiPayload.childCount = payload.childCount;
   if (payload.seniorCount !== undefined) apiPayload.seniorCount = payload.seniorCount;
   if (payload.commissionPercentage !== undefined) apiPayload.commissionPercentage = payload.commissionPercentage;
+  if (payload.subtotal !== undefined) apiPayload.subtotal = payload.subtotal;
+  if (payload.vatAmount !== undefined) apiPayload.vatAmount = payload.vatAmount;
+  if (payload.total !== undefined) apiPayload.total = payload.total;
+  if (payload.exempt !== undefined) apiPayload.exempt = payload.exempt;
+  if (payload.commissionAmount !== undefined) apiPayload.commissionAmount = payload.commissionAmount;
   if (payload.customerName !== undefined) apiPayload.customerName = payload.customerName;
   if (payload.customerEmail !== undefined) apiPayload.customerEmail = payload.customerEmail;
   if (payload.customerPhone !== undefined) apiPayload.customerPhone = payload.customerPhone;

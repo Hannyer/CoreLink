@@ -52,8 +52,8 @@ import type { AxiosError } from "axios";
  * - Se agregó soporte para seleccionar tipo de pago (`paymentTypeId`) y tipo de tarjeta (`cardTypeId`)
  *   consumiendo los catálogos `/api/payment-types` y `/api/card-types`.
  * - Cuando el tipo de pago es "Tarjeta", el tipo de tarjeta es obligatorio antes de crear/actualizar la reserva.
- * - El payload enviado al endpoint POST/PUT `/api/bookings` ahora incluye `paymentTypeId`, `cardTypeId` (cuando aplica)
- *   y un comentario opcional (`comment`).
+ * - El payload POST/PUT incluye montos (`subtotal`, `vatAmount`, `total`), `exempt` y `commissionAmount`
+ *   alineados con el cálculo del asistente (precios por categoría, IVA y comisión).
  */
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string; title?: string }>;
@@ -429,7 +429,7 @@ export default function BookingsPage() {
         customerEmail: booking.customerEmail ?? null,
         customerPhone: booking.customerPhone ?? null,
         comment: booking.comment ?? "",
-        exonerateTax: false,
+        exonerateTax: booking.exempt ?? false,
         status: booking.status,
       });
       setBookingWizardStep(0);
@@ -659,12 +659,16 @@ export default function BookingsPage() {
           : companies.find((c) => c.id === formData.companyId)?.commissionPercentage;
     }
 
-    // Reservado para persistencia futura del monto de comisión en BD.
-    const commissionAmountForPersistence = bookingEstimatedCommissionAmount;
-    void commissionAmountForPersistence;
+    const roundMoney = (n: number) => Math.round(n * 100) / 100;
 
     try {
       setFormLoading(true);
+
+      const subtotalPersist = roundMoney(bookingEstimatedTotal);
+      const vatAmountPersist = roundMoney(bookingEstimatedTaxAmount);
+      const totalPersist = roundMoney(bookingEstimatedGrandTotal);
+      const commissionAmountPersist =
+        formData.companyId != null ? roundMoney(bookingEstimatedCommissionAmount) : null;
 
       const payload: BookingFormData = {
         activityScheduleId: formData.activityScheduleId,
@@ -678,6 +682,11 @@ export default function BookingsPage() {
         seniorCount: seniorVal,
         passengerCount: formData.transport ? formData.passengerCount : null,
         commissionPercentage: finalCommission,
+        subtotal: subtotalPersist,
+        vatAmount: vatAmountPersist,
+        total: totalPersist,
+        exempt: formData.exonerateTax,
+        commissionAmount: commissionAmountPersist,
         customerName: formData.customerName.trim(),
         customerEmail: formData.customerEmail?.trim() || null,
         customerPhone: formData.customerPhone?.trim() || null,
@@ -909,6 +918,56 @@ export default function BookingsPage() {
       align: "center",
       hideOnMobile: true,
       accessor: (b) => `${b.commissionPercentage}%`,
+    },
+    {
+      key: "commissionAmount",
+      header: "Comisión ($)",
+      width: "110px",
+      align: "right",
+      hideOnMobile: true,
+      accessor: (b) =>
+        b.commissionAmount != null ? `$${formatPrice(b.commissionAmount)}` : "—",
+    },
+    {
+      key: "subtotal",
+      header: "Subtotal",
+      width: "100px",
+      align: "right",
+      hideOnMobile: true,
+      accessor: (b) => (b.subtotal != null ? `$${formatPrice(b.subtotal)}` : "—"),
+    },
+    {
+      key: "vatAmount",
+      header: "IVA",
+      width: "90px",
+      align: "right",
+      hideOnMobile: true,
+      accessor: (b) => (b.vatAmount != null ? `$${formatPrice(b.vatAmount)}` : "—"),
+    },
+    {
+      key: "total",
+      header: "Total",
+      width: "100px",
+      align: "right",
+      hideOnMobile: true,
+      accessor: (b) => (b.total != null ? `$${formatPrice(b.total)}` : "—"),
+    },
+    {
+      key: "exempt",
+      header: "Exon. IVA",
+      width: "100px",
+      align: "center",
+      hideOnMobile: true,
+      render: (b) => (
+        <span
+          style={{
+            ...badgeStyles.base,
+            ...(b.exempt ? badgeStyles.success : badgeStyles.info),
+          }}
+        >
+          {b.exempt ? "Sí" : "No"}
+        </span>
+      ),
     },
     {
       key: "status",

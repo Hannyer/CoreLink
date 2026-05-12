@@ -544,6 +544,16 @@ export interface Booking {
   seniorCount: number;
   passengerCount?: number | null;
   commissionPercentage: number;
+  /** Subtotal antes de IVA (persistido por API) */
+  subtotal?: number | null;
+  /** Monto de IVA */
+  vatAmount?: number | null;
+  /** Total general */
+  total?: number | null;
+  /** Exonerado de impuestos */
+  exempt?: boolean;
+  /** Monto de comisión */
+  commissionAmount?: number | null;
   customerName: string;
   customerEmail?: string | null;
   customerPhone?: string | null;
@@ -574,6 +584,11 @@ export interface BookingFormData {
   seniorCount: number;
   passengerCount?: number | null;
   commissionPercentage?: number;
+  subtotal?: number | null;
+  vatAmount?: number | null;
+  total?: number | null;
+  exempt?: boolean;
+  commissionAmount?: number | null;
   customerName: string;
   customerEmail?: string | null;
   customerPhone?: string | null;

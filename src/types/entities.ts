@@ -254,6 +254,9 @@ export interface Transport {
   id: string;
   model: string;
   capacity: number; // Capacidad de pasajeros
+  licensePlate: string;
+  circulationPermitExpirationDate: string | null;
+  ctpExpirationDate: string | null;
   operationalStatus: boolean; // Estado operacional
   status: boolean; // Estado general (activo/inactivo)
   createdAt: string;
@@ -296,6 +299,24 @@ export interface ActivityFormData {
   childPrice: number;
   seniorPrice: number;
   status?: boolean; // true = activa, false = inactiva
+}
+
+// ============================================
+// ACTIVITY TYPE (Tipo de actividad)
+// ============================================
+export interface ActivityType {
+  id: string;
+  name: string;
+  description: string | null;
+  status: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ActivityTypeFormData {
+  name: string;
+  description?: string | null;
+  status?: boolean;
 }
 
 export interface ActivityScheduleFormData {
@@ -382,6 +403,9 @@ export interface PickupPointFormData {
 export interface TransportFormData {
   model: string;
   capacity: number;
+  licensePlate: string;
+  circulationPermitExpirationDate: string;
+  ctpExpirationDate: string;
   operationalStatus?: boolean;
   status?: boolean;
 }

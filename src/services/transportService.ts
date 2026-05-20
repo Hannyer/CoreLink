@@ -18,6 +18,13 @@ function mapApiTransportToTransport(apiTransport: any): Transport {
     id: apiTransport.id,
     model: apiTransport.model,
     capacity: apiTransport.capacity,
+    licensePlate: apiTransport.licensePlate ?? apiTransport.licenseplate ?? "",
+    circulationPermitExpirationDate:
+      apiTransport.circulationPermitExpirationDate ??
+      apiTransport.circulationpermitexpirationdate ??
+      null,
+    ctpExpirationDate:
+      apiTransport.ctpExpirationDate ?? apiTransport.ctpexpirationdate ?? null,
     operationalStatus: apiTransport.operationalStatus ?? apiTransport.operationalstatus ?? true,
     status: apiTransport.status ?? true,
     createdAt: apiTransport.createdAt || new Date().toISOString(),
@@ -104,6 +111,9 @@ export async function createTransport(payload: TransportFormData): Promise<Trans
   const apiPayload = {
     model: payload.model,
     capacity: payload.capacity,
+    licensePlate: payload.licensePlate,
+    circulationPermitExpirationDate: payload.circulationPermitExpirationDate,
+    ctpExpirationDate: payload.ctpExpirationDate,
     operationalStatus: payload.operationalStatus ?? true,
     status: payload.status ?? true,
   };
@@ -120,6 +130,13 @@ export async function updateTransport(id: string, payload: Partial<TransportForm
   
   if (payload.model !== undefined) apiPayload.model = payload.model;
   if (payload.capacity !== undefined) apiPayload.capacity = payload.capacity;
+  if (payload.licensePlate !== undefined) apiPayload.licensePlate = payload.licensePlate;
+  if (payload.circulationPermitExpirationDate !== undefined) {
+    apiPayload.circulationPermitExpirationDate = payload.circulationPermitExpirationDate;
+  }
+  if (payload.ctpExpirationDate !== undefined) {
+    apiPayload.ctpExpirationDate = payload.ctpExpirationDate;
+  }
   if (payload.operationalStatus !== undefined) apiPayload.operationalStatus = payload.operationalStatus;
   if (payload.status !== undefined) apiPayload.status = payload.status;
   

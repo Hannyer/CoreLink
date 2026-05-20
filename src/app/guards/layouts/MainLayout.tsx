@@ -17,7 +17,8 @@ import {
   Search,
   X,
   CalendarClock,
-  Building2
+  Building2,
+  Tags,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -171,6 +172,19 @@ export default function MainLayout() {
             <div className="sidebar-section mt-3 mb-1">
               {(!collapsed || isMobile) && <small className="text-white-50 px-3">Operación</small>}
             </div>
+            <li>
+              <NavLink
+                to="/activity-types"
+                className={linkCls}
+                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
+                data-bs-placement="right"
+                title={collapsed && !isMobile ? "Tipos de actividad" : undefined}
+                onClick={handleNavClick}
+              >
+                <Tags size={20} />
+                {(!collapsed || isMobile) && "Tipos de actividad"}
+              </NavLink>
+            </li>
             <li>
               <NavLink
                 to="/activities"

@@ -31,6 +31,20 @@ function getErrorMessage(error: unknown): string {
   return "Ha ocurrido un error. Por favor, intenta nuevamente.";
 }
 
+function toDateInputValue(value: string | null | undefined): string {
+  if (!value) return "";
+  return value.length <= 10 ? value : value.slice(0, 10);
+}
+
+function formatTransportDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  try {
+    return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(value));
+  } catch {
+    return value.slice(0, 10);
+  }
+}
+
 export default function TransportsPage() {
   const [transports, setTransports] = useState<Transport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +64,9 @@ export default function TransportsPage() {
     model: "",
     capacity: 1,
     capacityInput: "",
+    licensePlate: "",
+    circulationPermitExpirationDate: "",
+    ctpExpirationDate: "",
     operationalStatus: true,
     status: true,
   });
@@ -79,6 +96,9 @@ export default function TransportsPage() {
       model: "",
       capacity: 1,
       capacityInput: "",
+      licensePlate: "",
+      circulationPermitExpirationDate: "",
+      ctpExpirationDate: "",
       operationalStatus: true,
       status: true,
     });
@@ -91,6 +111,9 @@ export default function TransportsPage() {
       model: transport.model,
       capacity: transport.capacity,
       capacityInput: transport.capacity,
+      licensePlate: transport.licensePlate,
+      circulationPermitExpirationDate: toDateInputValue(transport.circulationPermitExpirationDate),
+      ctpExpirationDate: toDateInputValue(transport.ctpExpirationDate),
       operationalStatus: transport.operationalStatus,
       status: transport.status,
     });
@@ -134,6 +157,21 @@ export default function TransportsPage() {
       return;
     }
 
+    if (!formData.licensePlate.trim()) {
+      toast.error("La placa es requerida");
+      return;
+    }
+
+    if (!formData.circulationPermitExpirationDate?.trim()) {
+      toast.error("La fecha de vencimiento del permiso de circulación es requerida");
+      return;
+    }
+
+    if (!formData.ctpExpirationDate?.trim()) {
+      toast.error("La fecha de vencimiento del CTP es requerida");
+      return;
+    }
+
     // Validar capacidad: debe tener un valor y ser mayor que 0
     const capacityValue = typeof formData.capacityInput === 'string' 
       ? (formData.capacityInput.trim() === '' ? null : parseInt(formData.capacityInput.trim(), 10))
@@ -150,6 +188,9 @@ export default function TransportsPage() {
       const payload: TransportFormData = {
         model: formData.model.trim(),
         capacity: capacityValue,
+        licensePlate: formData.licensePlate.trim().toUpperCase(),
+        circulationPermitExpirationDate: formData.circulationPermitExpirationDate.trim(),
+        ctpExpirationDate: formData.ctpExpirationDate.trim(),
         operationalStatus: formData.operationalStatus,
         status: formData.status,
       };
@@ -175,11 +216,31 @@ export default function TransportsPage() {
   const columns: Column<Transport>[] = [
     { key: "model", header: "Modelo", accessor: (t) => t.model },
     {
+      key: "licensePlate",
+      header: "Placa",
+      width: "120px",
+      accessor: (t) => t.licensePlate || "—",
+    },
+    {
       key: "capacity",
       header: "Capacidad",
       width: "120px",
       align: "center",
       accessor: (t) => t.capacity,
+    },
+    {
+      key: "circulationPermitExpirationDate",
+      header: "Venc. circulación",
+      width: "150px",
+      hideOnMobile: true,
+      accessor: (t) => formatTransportDate(t.circulationPermitExpirationDate),
+    },
+    {
+      key: "ctpExpirationDate",
+      header: "Venc. CTP",
+      width: "130px",
+      hideOnMobile: true,
+      accessor: (t) => formatTransportDate(t.ctpExpirationDate),
     },
     {
       key: "operationalStatus",
@@ -269,20 +330,40 @@ export default function TransportsPage() {
         isOpen={showModal}
         onClose={() => !formLoading && setShowModal(false)}
         title={editingTransport ? "Editar Transporte" : "Nuevo Transporte"}
-        size="md"
+        size="lg"
         closeOnBackdropClick={!formLoading}
         showCloseButton={!formLoading}
       >
         <form onSubmit={handleSubmit}>
-          <FormInput
-            label="Modelo"
-            value={formData.model}
-            onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-            required
-            fullWidth
-            disabled={formLoading}
-            placeholder="Ej: Toyota Hiace 2020"
-          />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "12px",
+            }}
+          >
+            <FormInput
+              label="Modelo"
+              value={formData.model}
+              onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+              required
+              fullWidth
+              disabled={formLoading}
+              placeholder="Ej: Toyota Hiace 2020"
+            />
+
+            <FormInput
+              label="Placa"
+              value={formData.licensePlate}
+              onChange={(e) =>
+                setFormData({ ...formData, licensePlate: e.target.value.toUpperCase() })
+              }
+              required
+              fullWidth
+              disabled={formLoading}
+              placeholder="Ej: ABC-123"
+            />
+          </div>
 
           <FormInput
             label="Capacidad"
@@ -291,7 +372,7 @@ export default function TransportsPage() {
             onChange={(e) =>
               setFormData({
                 ...formData,
-                capacityInput: e.target.value === '' ? '' : e.target.value,
+                capacityInput: e.target.value === "" ? "" : e.target.value,
               })
             }
             min={1}
@@ -300,6 +381,44 @@ export default function TransportsPage() {
             disabled={formLoading}
             placeholder="Número de pasajeros"
           />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "12px",
+            }}
+          >
+            <FormInput
+              label="Vencimiento permiso de circulación"
+              type="date"
+              value={formData.circulationPermitExpirationDate}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  circulationPermitExpirationDate: e.target.value,
+                })
+              }
+              required
+              fullWidth
+              disabled={formLoading}
+            />
+
+            <FormInput
+              label="Vencimiento CTP"
+              type="date"
+              value={formData.ctpExpirationDate}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  ctpExpirationDate: e.target.value,
+                })
+              }
+              required
+              fullWidth
+              disabled={formLoading}
+            />
+          </div>
 
           <FormCheckbox
             label="Estado Operacional"

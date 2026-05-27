@@ -319,6 +319,34 @@ export interface ActivityTypeFormData {
   status?: boolean;
 }
 
+// ============================================
+// ROLE (Rol de usuario — catálogo ops.role)
+// ============================================
+export interface Role {
+  id: string;
+  name: string;
+  description: string | null;
+  requiresLicense: boolean;
+  status: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RoleFormData {
+  name: string;
+  description?: string | null;
+  requiresLicense?: boolean;
+  status?: boolean;
+}
+
+/** Formato de GET /api/roles/select (value = id, label = name) */
+export interface RoleSelectOption {
+  value: string;
+  label: string;
+  description?: string | null;
+  requiresLicense?: boolean;
+}
+
 export interface ActivityScheduleFormData {
   scheduledStart: string; // ISO datetime
   scheduledEnd: string; // ISO datetime

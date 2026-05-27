@@ -19,6 +19,7 @@ import {
   CalendarClock,
   Building2,
   Tags,
+  Shield,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -278,6 +279,19 @@ export default function MainLayout() {
               >
                 <Building2 size={20} />
                 {(!collapsed || isMobile) && "Compañías"}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/roles"
+                className={linkCls}
+                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
+                data-bs-placement="right"
+                title={collapsed && !isMobile ? "Roles" : undefined}
+                onClick={handleNavClick}
+              >
+                <Shield size={20} />
+                {(!collapsed || isMobile) && "Roles"}
               </NavLink>
             </li>
             <li>

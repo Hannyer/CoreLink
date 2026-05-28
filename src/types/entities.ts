@@ -347,6 +347,42 @@ export interface RoleSelectOption {
   requiresLicense?: boolean;
 }
 
+// ============================================
+// USER (Usuario del sistema — ops.app_user)
+// ============================================
+export interface User {
+  id: string;
+  cedula: string;
+  email: string;
+  fullName: string;
+  phone: string;
+  roleId: string;
+  roleName?: string;
+  roleRequiresLicense?: boolean;
+  licenseExpirationDate: string | null;
+  speaksEnglish: boolean;
+  status: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserFormData {
+  cedula: string;
+  email: string;
+  fullName: string;
+  phone: string;
+  password: string;
+  roleId: string;
+  licenseExpirationDate?: string | null;
+  speaksEnglish?: boolean;
+  status?: boolean;
+}
+
+export interface UserFilters {
+  status?: boolean;
+  roleId?: string;
+}
+
 export interface ActivityScheduleFormData {
   scheduledStart: string; // ISO datetime
   scheduledEnd: string; // ISO datetime

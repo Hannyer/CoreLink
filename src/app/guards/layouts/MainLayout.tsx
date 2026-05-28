@@ -296,6 +296,19 @@ export default function MainLayout() {
             </li>
             <li>
               <NavLink
+                to="/users"
+                className={linkCls}
+                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
+                data-bs-placement="right"
+                title={collapsed && !isMobile ? "Usuarios" : undefined}
+                onClick={handleNavClick}
+              >
+                <UserCircle2 size={20} />
+                {(!collapsed || isMobile) && "Usuarios"}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
                 to="/clientes"
                 className={linkCls}
                 data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}

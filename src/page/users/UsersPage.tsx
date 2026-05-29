@@ -20,6 +20,7 @@ import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus, Eye, EyeOff } from "lucide-react";
 import type { User, UserFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
+import { toDateInputValueOrNull, todayDateInputValue } from "@/utils/dateUtils";
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -118,7 +119,8 @@ export default function UsersPage() {
   // ── derived ──
 
   const selectedRole = roleOptions.find((r) => r.value === formData.roleId);
-  const requiresLicense = selectedRole?.requiresLicense ?? false;
+  const requiresLicense =
+    selectedRole?.requiresLicense ?? editingUser?.roleRequiresLicense ?? false;
 
   // ── handlers ──
 
@@ -138,7 +140,7 @@ export default function UsersPage() {
       phone: user.phone,
       password: "", // nunca cargamos la contraseña
       roleId: user.roleId,
-      licenseExpirationDate: user.licenseExpirationDate ?? null,
+      licenseExpirationDate: toDateInputValueOrNull(user.licenseExpirationDate),
       speaksEnglish: user.speaksEnglish,
       status: user.status,
     });
@@ -584,13 +586,19 @@ export default function UsersPage() {
               label="Fecha de vencimiento de licencia"
               value={formData.licenseExpirationDate ?? ""}
               onChange={(val) =>
-                setFormData({ ...formData, licenseExpirationDate: val || null })
+                setFormData({
+                  ...formData,
+                  licenseExpirationDate: val ? val : null,
+                })
+              }
+              minDate={
+                editingUser ? "1970-01-01" : todayDateInputValue()
               }
               required
               fullWidth
               disabled={formLoading}
               placeholder="Seleccionar fecha"
-              helperText="Requerido para el rol seleccionado"
+              helperText="Puedes elegir cualquier fecha desde hoy en adelante"
             />
           )}
 

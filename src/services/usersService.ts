@@ -5,6 +5,7 @@ import type {
   PaginatedResponse,
 } from "@/types/entities";
 import type { SelectOption } from "@/components/form/FormSelect";
+import { toDateInputValueOrNull } from "@/utils/dateUtils";
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -19,8 +20,9 @@ function mapApiUser(raw: any): User {
     roleName: raw.roleName ?? raw.role_name ?? undefined,
     roleRequiresLicense:
       raw.roleRequiresLicense ?? raw.role_requires_license ?? false,
-    licenseExpirationDate:
-      raw.licenseExpirationDate ?? raw.license_expiration_date ?? null,
+    licenseExpirationDate: toDateInputValueOrNull(
+      raw.licenseExpirationDate ?? raw.license_expiration_date
+    ),
     speaksEnglish: raw.speaksEnglish ?? raw.speaks_english ?? false,
     status: raw.status ?? true,
     createdAt: raw.createdAt ?? raw.created_at ?? "",

@@ -20,6 +20,9 @@ function mapApiUser(raw: any): User {
     roleName: raw.roleName ?? raw.role_name ?? undefined,
     roleRequiresLicense:
       raw.roleRequiresLicense ?? raw.role_requires_license ?? false,
+    roleRequiresLanguages:
+      raw.roleRequiresLanguages ?? raw.role_requires_languages ?? false,
+    languages: Array.isArray(raw.languages) ? raw.languages : [],
     licenseExpirationDate: toDateInputValueOrNull(
       raw.licenseExpirationDate ?? raw.license_expiration_date
     ),
@@ -35,6 +38,7 @@ function mapApiUser(raw: any): User {
 export interface UserRoleOption extends SelectOption {
   description?: string | null;
   requiresLicense?: boolean;
+  requiresLanguages?: boolean;
 }
 
 /**
@@ -50,6 +54,7 @@ export async function fetchUserRoles(): Promise<UserRoleOption[]> {
     label: r.label ?? String(r.value),
     description: r.description ?? null,
     requiresLicense: r.requiresLicense ?? false,
+    requiresLanguages: r.requiresLanguages ?? false,
   }));
 }
 
@@ -103,6 +108,9 @@ export async function createUser(payload: UserFormData): Promise<User> {
   if (payload.licenseExpirationDate) {
     body.licenseExpirationDate = payload.licenseExpirationDate;
   }
+  if (payload.languageIds && payload.languageIds.length > 0) {
+    body.languageIds = payload.languageIds;
+  }
 
   const { data } = await api.post<any>("/api/users", body);
   return mapApiUser(data);
@@ -128,6 +136,9 @@ export async function updateUser(
   if (payload.speaksEnglish !== undefined)
     body.speaksEnglish = payload.speaksEnglish;
   if (payload.status !== undefined) body.status = payload.status;
+  if (payload.languageIds !== undefined) {
+    body.languageIds = payload.languageIds;
+  }
 
   const { data } = await api.put<any>(`/api/users/${id}`, body);
   return mapApiUser(data);

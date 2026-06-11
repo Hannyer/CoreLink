@@ -165,23 +165,6 @@ export default function RolesPage() {
       accessor: (r) => r.description?.trim() || "—",
     },
     {
-      key: "requiresLicense",
-      header: "Requiere licencia",
-      width: "140px",
-      align: "center",
-      hideOnMobile: true,
-      render: (r) => (
-        <span
-          style={{
-            ...badgeStyles.base,
-            ...(r.requiresLicense ? badgeStyles.warn : badgeStyles.info),
-          }}
-        >
-          {r.requiresLicense ? "Sí" : "No"}
-        </span>
-      ),
-    },
-    {
       key: "status",
       header: "Estado",
       width: "110px",
@@ -316,16 +299,7 @@ export default function RolesPage() {
             disabled={formLoading}
             placeholder="Opcional"
             rows={3}
-          />
-
-          <FormCheckbox
-            label="Requiere licencia de conducir"
-            checked={formData.requiresLicense ?? false}
-            onChange={(e) =>
-              setFormData({ ...formData, requiresLicense: e.target.checked })
-            }
-            disabled={formLoading}
-          />
+          />      
 
           <FormCheckbox
             label="Activo"

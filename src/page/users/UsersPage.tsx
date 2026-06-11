@@ -21,6 +21,7 @@ import { Edit, Trash2, Plus, Eye, EyeOff } from "lucide-react";
 import type { User, UserFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
 import { toDateInputValueOrNull, todayDateInputValue } from "@/utils/dateUtils";
+import { getLanguages, type Language } from "@/services/languageService";
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -46,9 +47,14 @@ const EMPTY_FORM: UserFormData = {
   password: "",
   roleId: "",
   licenseExpirationDate: null,
+  languageIds: [],
   speaksEnglish: false,
   status: true,
 };
+
+/** IDs de rol (ops.role) — deben coincidir con el API */
+const ROLE_ID_CONDUCTOR = "b07fe1a3-40e2-4cb8-9fd7-ff6df2a2dba3";
+const ROLE_ID_GUIA = "9d3372fa-7180-4f04-9727-374e9b513d53";
 
 // ── componente ──────────────────────────────────────────────────────
 
@@ -64,6 +70,8 @@ export default function UsersPage() {
   const [formData, setFormData] = useState<UserFormData>({ ...EMPTY_FORM });
   const [formLoading, setFormLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [loadingLanguages, setLoadingLanguages] = useState(false);
 
   // ── pagination / filter state ──
   const [page, setPage] = useState(1);
@@ -120,7 +128,34 @@ export default function UsersPage() {
 
   const selectedRole = roleOptions.find((r) => r.value === formData.roleId);
   const requiresLicense =
-    selectedRole?.requiresLicense ?? editingUser?.roleRequiresLicense ?? false;
+    selectedRole?.requiresLicense ??
+    editingUser?.roleRequiresLicense ??
+    formData.roleId === ROLE_ID_CONDUCTOR;
+  const requiresLanguages =
+    selectedRole?.requiresLanguages ??
+    editingUser?.roleRequiresLanguages ??
+    formData.roleId === ROLE_ID_GUIA;
+
+  const loadLanguages = async () => {
+    try {
+      setLoadingLanguages(true);
+      const list = await getLanguages();
+      setLanguages(list.filter((l) => l.status !== false));
+    } catch (error) {
+      console.error("Error al cargar idiomas:", error);
+      toast.error("Error al cargar idiomas");
+    } finally {
+      setLoadingLanguages(false);
+    }
+  };
+
+  const handleLanguageToggle = (languageId: string) => {
+    const current = formData.languageIds ?? [];
+    const next = current.includes(languageId)
+      ? current.filter((id) => id !== languageId)
+      : [...current, languageId];
+    setFormData({ ...formData, languageIds: next });
+  };
 
   // ── handlers ──
 
@@ -129,6 +164,7 @@ export default function UsersPage() {
     setFormData({ ...EMPTY_FORM });
     setShowPassword(false);
     setShowModal(true);
+    void loadLanguages();
   };
 
   const handleEdit = (user: User) => {
@@ -141,11 +177,13 @@ export default function UsersPage() {
       password: "", // nunca cargamos la contraseña
       roleId: user.roleId,
       licenseExpirationDate: toDateInputValueOrNull(user.licenseExpirationDate),
+      languageIds: user.languages?.map((l) => l.id) ?? [],
       speaksEnglish: user.speaksEnglish,
       status: user.status,
     });
     setShowPassword(false);
     setShowModal(true);
+    void loadLanguages();
   };
 
   const handleDeactivate = async (id: string) => {
@@ -205,8 +243,12 @@ export default function UsersPage() {
     }
     if (requiresLicense && !formData.licenseExpirationDate) {
       toast.error(
-        "La fecha de vencimiento de licencia es requerida para este rol"
+        "La fecha de vencimiento de licencia es obligatoria para el rol Conductor"
       );
+      return;
+    }
+    if (requiresLanguages && (!formData.languageIds || formData.languageIds.length === 0)) {
+      toast.error("Debe seleccionar al menos un idioma para el rol Guía");
       return;
     }
 
@@ -225,6 +267,10 @@ export default function UsersPage() {
           speaksEnglish: formData.speaksEnglish,
           status: formData.status,
         };
+
+        if (requiresLanguages) {
+          payload.languageIds = formData.languageIds ?? [];
+        }
 
         // Solo enviar password si el usuario escribió una nueva
         if (formData.password) {
@@ -560,19 +606,25 @@ export default function UsersPage() {
             label="Rol"
             options={roleOptions}
             value={formData.roleId}
-            onChange={(val) =>
+            onChange={(val) => {
+              const nextRoleId = String(val);
+              const nextRole = roleOptions.find((r) => r.value === nextRoleId);
+              const nextRequiresLicense =
+                nextRole?.requiresLicense ?? nextRoleId === ROLE_ID_CONDUCTOR;
+              const nextRequiresLanguages =
+                nextRole?.requiresLanguages ?? nextRoleId === ROLE_ID_GUIA;
+
               setFormData({
                 ...formData,
-                roleId: String(val),
-                // Limpiar fecha de licencia si el nuevo rol no la requiere
-                ...(!(
-                  roleOptions.find((r) => r.value === String(val))
-                    ?.requiresLicense
-                )
-                  ? { licenseExpirationDate: null }
-                  : {}),
-              })
-            }
+                roleId: nextRoleId,
+                ...(!nextRequiresLicense ? { licenseExpirationDate: null } : {}),
+                ...(!nextRequiresLanguages ? { languageIds: [] } : {}),
+              });
+
+              if (nextRequiresLanguages && languages.length === 0) {
+                void loadLanguages();
+              }
+            }}
             required
             fullWidth
             disabled={formLoading}
@@ -583,7 +635,7 @@ export default function UsersPage() {
           {/* Fila 5: Fecha licencia (condicional) */}
           {requiresLicense && (
             <DatePicker
-              label="Fecha de vencimiento de licencia"
+              label="Fecha de vencimiento de licencia *"
               value={formData.licenseExpirationDate ?? ""}
               onChange={(val) =>
                 setFormData({
@@ -598,8 +650,68 @@ export default function UsersPage() {
               fullWidth
               disabled={formLoading}
               placeholder="Seleccionar fecha"
-              helperText="Puedes elegir cualquier fecha desde hoy en adelante"
+              helperText="Obligatorio para el rol Conductor"
             />
+          )}
+
+          {requiresLanguages && (
+            <div style={{ marginTop: "8px", marginBottom: "8px" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "#1e293b",
+                }}
+              >
+                Idiomas <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              {loadingLanguages ? (
+                <div style={{ color: "#64748b", fontSize: "0.875rem" }}>
+                  Cargando idiomas...
+                </div>
+              ) : languages.length === 0 ? (
+                <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>
+                  No hay idiomas disponibles
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    padding: "12px",
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    borderRadius: "8px",
+                    backgroundColor: formLoading ? "#f1f5f9" : "#ffffff",
+                    maxHeight: "200px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {languages.map((language) => (
+                    <FormCheckbox
+                      key={language.id}
+                      label={`${language.name} (${language.code})`}
+                      checked={(formData.languageIds ?? []).includes(language.id)}
+                      onChange={() => handleLanguageToggle(language.id)}
+                      disabled={formLoading}
+                    />
+                  ))}
+                </div>
+              )}
+              {(!formData.languageIds || formData.languageIds.length === 0) && (
+                <div
+                  style={{
+                    marginTop: "6px",
+                    fontSize: "0.875rem",
+                    color: "#ef4444",
+                  }}
+                >
+                  Obligatorio para el rol Guía: seleccione al menos un idioma
+                </div>
+              )}
+            </div>
           )}
 
           {/* Checkboxes */}

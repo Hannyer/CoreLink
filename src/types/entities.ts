@@ -345,6 +345,13 @@ export interface RoleSelectOption {
   label: string;
   description?: string | null;
   requiresLicense?: boolean;
+  requiresLanguages?: boolean;
+}
+
+export interface UserLanguage {
+  id: string;
+  code: string;
+  name: string;
 }
 
 // ============================================
@@ -359,7 +366,9 @@ export interface User {
   roleId: string;
   roleName?: string;
   roleRequiresLicense?: boolean;
+  roleRequiresLanguages?: boolean;
   licenseExpirationDate: string | null;
+  languages?: UserLanguage[];
   speaksEnglish: boolean;
   status: boolean;
   createdAt: string;
@@ -374,6 +383,7 @@ export interface UserFormData {
   password: string;
   roleId: string;
   licenseExpirationDate?: string | null;
+  languageIds?: string[];
   speaksEnglish?: boolean;
   status?: boolean;
 }

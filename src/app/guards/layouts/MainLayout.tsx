@@ -2,29 +2,17 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { logout } from "@/services/authService";
 import {
   CalendarCheck,
-  CalendarRange,
-  ClipboardList,
-  Users,
-  BusFront,
-  UserCircle2,
-  Package,
-  BarChart3,
-  Settings,
   LogOut,
-  Home,
-  FilePlus2,
   Menu,
   Search,
   X,
-  CalendarClock,
-  Building2,
-  Tags,
-  Shield,
+  FilePlus2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import DynamicSidebarNav from "@/components/layout/DynamicSidebarNav";
 
 declare global { interface Window { bootstrap: any } }
 
@@ -138,215 +126,12 @@ export default function MainLayout() {
         </div>
 
         <nav className="mt-3 px-2">
-          <ul className="nav flex-column gap-1">
-            <li>
-              <NavLink
-                to="/home"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Inicio" : undefined}
-                onClick={handleNavClick}
-              >
-                <Home size={20} />
-                {(!collapsed || isMobile) && "Inicio"}
-              </NavLink>
-            </li>
-
-            <div className="sidebar-section mt-2 mb-1">
-              {(!collapsed || isMobile) && <small className="text-white-50 px-3">Reservas</small>}
-            </div>
-            <li>
-              <NavLink
-                to="/bookings"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Reservas" : undefined}
-                onClick={handleNavClick}
-              >
-                <ClipboardList size={20} />
-                {(!collapsed || isMobile) && "Reservas"}
-              </NavLink>
-            </li>
-
-            <div className="sidebar-section mt-3 mb-1">
-              {(!collapsed || isMobile) && <small className="text-white-50 px-3">Operación</small>}
-            </div>
-            <li>
-              <NavLink
-                to="/activity-types"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Tipos de actividad" : undefined}
-                onClick={handleNavClick}
-              >
-                <Tags size={20} />
-                {(!collapsed || isMobile) && "Tipos de actividad"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/activities"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Actividades" : undefined}
-                onClick={handleNavClick}
-              >
-                <CalendarRange size={20} />
-                {(!collapsed || isMobile) && "Actividades"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/schedules"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Planeaciones" : undefined}
-                onClick={handleNavClick}
-              >
-                <CalendarClock size={20} />
-                {(!collapsed || isMobile) && "Planeaciones"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/operaciones"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Operaciones del día" : undefined}
-                onClick={handleNavClick}
-              >
-                <CalendarCheck size={20} />
-                {(!collapsed || isMobile) && "Operaciones del día"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/transports"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Transportes" : undefined}
-                onClick={handleNavClick}
-              >
-                <BusFront size={20} />
-                {(!collapsed || isMobile) && "Transportes"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/guides"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Guías" : undefined}
-                onClick={handleNavClick}
-              >
-                <UserCircle2 size={20} />
-                {(!collapsed || isMobile) && "Guías"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/unidades"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Unidades" : undefined}
-                onClick={handleNavClick}
-              >
-                <Package size={20} />
-                {(!collapsed || isMobile) && "Unidades"}
-              </NavLink>
-            </li>
-
-            <div className="sidebar-section mt-3 mb-1">
-              {(!collapsed || isMobile) && <small className="text-white-50 px-3">Gestión</small>}
-            </div>
-            <li>
-              <NavLink
-                to="/companies"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Compañías" : undefined}
-                onClick={handleNavClick}
-              >
-                <Building2 size={20} />
-                {(!collapsed || isMobile) && "Compañías"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/roles"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Roles" : undefined}
-                onClick={handleNavClick}
-              >
-                <Shield size={20} />
-                {(!collapsed || isMobile) && "Roles"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/users"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Usuarios" : undefined}
-                onClick={handleNavClick}
-              >
-                <UserCircle2 size={20} />
-                {(!collapsed || isMobile) && "Usuarios"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/clientes"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Clientes / Agencias" : undefined}
-                onClick={handleNavClick}
-              >
-                <Users size={20} />
-                {(!collapsed || isMobile) && "Clientes / Agencias"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/reportes"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Reportes" : undefined}
-                onClick={handleNavClick}
-              >
-                <BarChart3 size={20} />
-                {(!collapsed || isMobile) && "Reportes"}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/settings"
-                className={linkCls}
-                data-bs-toggle={collapsed && !isMobile ? "tooltip" : undefined}
-                data-bs-placement="right"
-                title={collapsed && !isMobile ? "Configuración" : undefined}
-                onClick={handleNavClick}
-              >
-                <Settings size={20} />
-                {(!collapsed || isMobile) && "Configuración"}
-              </NavLink>
-            </li>
-          </ul>
+          <DynamicSidebarNav
+            collapsed={collapsed}
+            isMobile={isMobile}
+            linkCls={linkCls}
+            onNavClick={handleNavClick}
+          />
         </nav>
 
         <div className="mt-auto p-3 border-top border-opacity-10">

@@ -717,3 +717,34 @@ export interface BookingFilters {
   activityScheduleId?: string;
 }
 
+// ============================================
+// BOOKING ASSIGNMENTS (Asignaciones del Operador)
+// ============================================
+
+export interface BookingGuideAssignment {
+  assignmentId: string;
+  id: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  status: boolean;
+  speaksEnglish?: boolean;
+  languages?: Array<{ id: string; code: string; name: string }>;
+  assignedAt: string;
+}
+
+export interface BookingTransportAssignment {
+  assignmentId: string;
+  id: string;
+  model: string;
+  capacity: number;
+  licensePlate: string;
+  operationalStatus: boolean;
+  assignedAt: string;
+}
+
+export interface BookingAssignments {
+  guides: BookingGuideAssignment[];
+  transport: BookingTransportAssignment | null;
+}
+

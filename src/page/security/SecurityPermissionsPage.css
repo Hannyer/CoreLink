@@ -1,7 +1,6 @@
 .permissions-page-container {
-  padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 1.5rem 0;
+  width: 100%;
   animation: fadeIn 0.4s ease-out;
 }
 
@@ -120,8 +119,8 @@
 /* Grid of Cards */
 .perm-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 1.5rem;
 }
 
 /* Individual Module Card */

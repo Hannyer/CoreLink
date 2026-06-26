@@ -17,6 +17,7 @@ import ActivityTypesPage from "@/page/activityTypes/ActivityTypesPage";
 import RolesPage from "@/page/roles/RolesPage";
 import UsersPage from "@/page/users/UsersPage";
 import SecurityPermissionsPage from "@/page/security/SecurityPermissionsPage";
+import OperatorPage from "@/page/operator/OperatorPage";
 
 const router = createBrowserRouter([
   // Público
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
       { path: "/users", element: <UsersPage /> },
       { path: "/security", element: <SecurityPermissionsPage /> },
       { path: "/bookings", element: <BookingsPage /> },
+      { path: "/operator", element: <OperatorPage /> },
       { path: "/transports", element: <TransportsPage /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "/dashboard", element: <h1>Zona Privada</h1> },

@@ -18,6 +18,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { FormInput } from "@/components/form/FormInput";
+import { usePermissions } from "@/hooks/usePermissions";
 import { FormCombobox, type SelectOption } from "@/components/form/FormCombobox";
 import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -76,6 +77,7 @@ const BOOKING_IVA_CONFIGURATION_ID =
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export default function BookingsPage() {
+  const { canWrite, canDelete } = usePermissions();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -983,20 +985,22 @@ export default function BookingsPage() {
       align: "center",
       render: (b) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEditBooking(b)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-            disabled={!canModifyBooking(b.scheduledStart)}
-            title={
-              !canModifyBooking(b.scheduledStart)
-                ? "No editable: falta menos de 1 hora"
-                : "Editar"
-            }
-          />
-          {b.status !== "cancelled" && (
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEditBooking(b)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+              disabled={!canModifyBooking(b.scheduledStart)}
+              title={
+                !canModifyBooking(b.scheduledStart)
+                  ? "No editable: falta menos de 1 hora"
+                  : "Editar"
+              }
+            />
+          )}
+          {canDelete && b.status !== "cancelled" && (
             <Button
               variant="danger"
               size="sm"
@@ -1044,9 +1048,11 @@ export default function BookingsPage() {
           disabled={loading}
         />
       </div>
-      <Button onClick={handleCreateBooking} icon={<Plus size={18} />} size="sm">
-        Nueva reserva
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreateBooking} icon={<Plus size={18} />} size="sm">
+          Nueva reserva
+        </Button>
+      )}
     </div>
   );
 
@@ -1056,7 +1062,7 @@ export default function BookingsPage() {
         title="Reservas de Actividades"
         loading={loading}
         data={bookings}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(b) => b.id}
         emptyText="No hay reservas aún"
         headerExtra={headerExtra}

@@ -17,6 +17,7 @@ import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus } from "lucide-react";
 import type { Role, RoleFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
+import { usePermissions } from "@/hooks/usePermissions";
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string; title?: string }>;
@@ -33,6 +34,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function RolesPage() {
+  const { canWrite, canDelete } = usePermissions();
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -182,15 +184,17 @@ export default function RolesPage() {
       align: "center",
       render: (r) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(r)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-            title="Editar"
-          />
-          {r.status && (
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(r)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+              title="Editar"
+            />
+          )}
+          {canDelete && r.status && (
             <Button
               variant="danger"
               size="sm"
@@ -239,9 +243,11 @@ export default function RolesPage() {
           Inactivos
         </Button>
       </div>
-      <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
-        Nuevo rol
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
+          Nuevo rol
+        </Button>
+      )}
     </div>
   );
 
@@ -251,7 +257,7 @@ export default function RolesPage() {
         title="Roles de usuario"
         loading={loading}
         data={roles}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(r) => r.id}
         emptyText="No hay roles registrados"
         headerExtra={headerExtra}

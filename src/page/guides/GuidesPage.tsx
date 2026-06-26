@@ -12,6 +12,7 @@ import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus } from "lucide-react";
 import type { Guide, GuideFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
+import { usePermissions } from "@/hooks/usePermissions";
 
 /**
  * Función helper para extraer el mensaje de error del formato del API
@@ -33,6 +34,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function GuidesPage() {
+  const { canWrite, canDelete } = usePermissions();
   const [guides, setGuides] = useState<Guide[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -229,20 +231,24 @@ export default function GuidesPage() {
       align: "center",
       render: (g) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(g)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDeleteClick(g.id)}
-            icon={<Trash2 size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(g)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
+          {canDelete && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDeleteClick(g.id)}
+              icon={<Trash2 size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
         </div>
       ),
     },
@@ -250,9 +256,11 @@ export default function GuidesPage() {
 
   const headerExtra = (
     <div style={{ display: "flex", gap: 8 }}>
-      <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
-        Nuevo guía
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
+          Nuevo guía
+        </Button>
+      )}
     </div>
   );
 
@@ -262,7 +270,7 @@ export default function GuidesPage() {
         title="Lista de guías"
         loading={loading}
         data={guides}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(g) => g.id}
         emptyText="No hay guías aún"
         headerExtra={headerExtra}

@@ -26,6 +26,7 @@ import type {
 } from "@/types/entities";
 import { Plus, Edit, Trash2, X } from "lucide-react";
 import type { AxiosError } from "axios";
+import { usePermissions } from "@/hooks/usePermissions";
 
 type ActivityRow = ActivityListItem;
 
@@ -85,6 +86,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function ActivitiesPage() {
+  const { canWrite, canDelete } = usePermissions();
   const toast = useToastContext();
   const { confirm, ConfirmDialogComponent } = useConfirm();
 
@@ -403,20 +405,24 @@ export default function ActivitiesPage() {
       align: "center",
       render: (row) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEditClick(row.id)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDeleteClick(row.id, row.title)}
-            icon={<Trash2 size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEditClick(row.id)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
+          {canDelete && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDeleteClick(row.id, row.title)}
+              icon={<Trash2 size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
         </div>
       ),
     },
@@ -446,9 +452,11 @@ export default function ActivitiesPage() {
           </Button>
         )}
       </div>
-      <Button onClick={handleCreateClick} icon={<Plus size={18} />} size="sm">
-        Nueva actividad
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreateClick} icon={<Plus size={18} />} size="sm">
+          Nueva actividad
+        </Button>
+      )}
     </div>
   );
 
@@ -463,7 +471,7 @@ export default function ActivitiesPage() {
         title="Actividades programadas"
         loading={loading}
         data={activities}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(row) => row.id}
         emptyText={dateFilter ? "No hay actividades para la fecha seleccionada" : "No hay actividades aún"}
         headerExtra={headerExtra}

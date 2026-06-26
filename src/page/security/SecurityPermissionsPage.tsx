@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { TableCard, type Column } from "@/components/ui/TableCard";
 import { Button } from "@/components/ui/Button";
 import { FormCombobox } from "@/components/form/FormCombobox";
-import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useToastContext } from "@/contexts/ToastContext";
 import { Save } from "lucide-react";
 import type { AxiosError } from "axios";
@@ -13,6 +11,7 @@ import {
   type MenuPermissionRow,
   type PermissionPayload,
 } from "@/services/securityService";
+import "./SecurityPermissionsPage.css";
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
@@ -42,7 +41,7 @@ export default function SecurityPermissionsPage() {
         toast.error(getErrorMessage(e));
       }
     })();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (!selectedRoleId) {
@@ -103,93 +102,19 @@ export default function SecurityPermissionsPage() {
     }
   };
 
-  const columns: Column<RowState>[] = [
-    {
-      key: "name",
-      header: "Módulo",
-      accessor: (r) => r.name,
-      render: (r) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{r.name}</div>
-          {r.section && (
-            <small style={{ color: "#64748b" }}>{r.section}</small>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "routePath",
-      header: "Ruta",
-      hideOnMobile: true,
-      accessor: (r) => r.routePath ?? "—",
-    },
-    {
-      key: "canRead",
-      header: "Leer",
-      width: "90px",
-      align: "center",
-      render: (r) => (
-        <FormCheckbox
-          label=""
-          checked={r.canRead}
-          onChange={(e) => updateRow(r.menuId, { canRead: e.target.checked })}
-          disabled={saving}
-        />
-      ),
-    },
-    {
-      key: "canWrite",
-      header: "Escribir",
-      width: "100px",
-      align: "center",
-      render: (r) => (
-        <FormCheckbox
-          label=""
-          checked={r.canWrite}
-          onChange={(e) => updateRow(r.menuId, { canWrite: e.target.checked })}
-          disabled={saving}
-        />
-      ),
-    },
-    {
-      key: "canDelete",
-      header: "Eliminar",
-      width: "100px",
-      align: "center",
-      render: (r) => (
-        <FormCheckbox
-          label=""
-          checked={r.canDelete}
-          onChange={(e) => updateRow(r.menuId, { canDelete: e.target.checked })}
-          disabled={saving}
-        />
-      ),
-    },
-  ];
+  const groupedRows = rows.reduce<Record<string, RowState[]>>((acc, row) => {
+    const section = row.section || "Otros";
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(row);
+    return acc;
+  }, {});
 
   return (
-    <TableCard<RowState>
-      title="Permisos de acceso por rol"
-      loading={loading}
-      data={rows}
-      columns={columns}
-      rowKey={(r) => r.menuId}
-      emptyText={
-        selectedRoleId
-          ? "No hay módulos configurados"
-          : "Seleccione un rol para configurar permisos"
-      }
-      headerExtra={
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            flexWrap: "wrap",
-            minWidth: 280,
-          }}
-        >
-          <div style={{ minWidth: 220, flex: 1 }}>
+    <div className="permissions-page-container">
+      <div className="perm-header">
+        <div className="perm-header-left">
+          <h1 className="perm-title">Permisos de Acceso</h1>
+          <div className="role-selector-wrapper">
             <FormCombobox
               label=""
               options={roleOptions}
@@ -200,16 +125,87 @@ export default function SecurityPermissionsPage() {
               fullWidth
             />
           </div>
-          <Button
-            onClick={handleSave}
-            loading={saving}
-            disabled={!selectedRoleId || loading}
-            icon={<Save size={18} />}
-          >
-            Guardar permisos
-          </Button>
         </div>
-      }
-    />
+        <Button
+          onClick={handleSave}
+          loading={saving}
+          disabled={!selectedRoleId || loading}
+          icon={<Save size={18} />}
+        >
+          Guardar permisos
+        </Button>
+      </div>
+
+      {!selectedRoleId ? (
+        <div className="perm-empty-state">
+          Seleccione un rol en la parte superior para configurar sus permisos.
+        </div>
+      ) : loading ? (
+        <div className="perm-loading">Cargando permisos...</div>
+      ) : rows.length === 0 ? (
+        <div className="perm-empty-state">
+          No hay módulos configurados para este rol.
+        </div>
+      ) : (
+        <div className="perm-sections">
+          {Object.entries(groupedRows).map(([section, sectionRows]) => (
+            <div key={section} className="perm-section">
+              <h2 className="perm-section-title">{section}</h2>
+              <div className="perm-grid">
+                {sectionRows.map((r) => (
+                  <div key={r.menuId} className="perm-card">
+                    <div className="perm-card-header">
+                      <span className="perm-card-title">{r.name}</span>
+                      <span className="perm-card-route">{r.routePath || "—"}</span>
+                    </div>
+
+                    <div className="perm-toggles">
+                      <div className="perm-toggle-group">
+                        <span className="perm-toggle-label">Leer</span>
+                        <label className="custom-toggle toggle-read">
+                          <input
+                            type="checkbox"
+                            checked={r.canRead}
+                            onChange={(e) => updateRow(r.menuId, { canRead: e.target.checked })}
+                            disabled={saving}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+                      
+                      <div className="perm-toggle-group">
+                        <span className="perm-toggle-label">Escribir</span>
+                        <label className="custom-toggle toggle-write">
+                          <input
+                            type="checkbox"
+                            checked={r.canWrite}
+                            onChange={(e) => updateRow(r.menuId, { canWrite: e.target.checked })}
+                            disabled={saving}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="perm-toggle-group">
+                        <span className="perm-toggle-label">Eliminar</span>
+                        <label className="custom-toggle toggle-delete">
+                          <input
+                            type="checkbox"
+                            checked={r.canDelete}
+                            onChange={(e) => updateRow(r.menuId, { canDelete: e.target.checked })}
+                            disabled={saving}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

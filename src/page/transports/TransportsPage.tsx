@@ -11,6 +11,7 @@ import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus } from "lucide-react";
 import type { Transport, TransportFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
+import { usePermissions } from "@/hooks/usePermissions";
 
 /**
  * Función helper para extraer el mensaje de error del formato del API
@@ -46,6 +47,7 @@ function formatTransportDate(value: string | null | undefined): string {
 }
 
 export default function TransportsPage() {
+  const { canWrite, canDelete } = usePermissions();
   const [transports, setTransports] = useState<Transport[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -271,20 +273,24 @@ export default function TransportsPage() {
       align: "center",
       render: (t) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(t)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDeleteClick(t.id)}
-            icon={<Trash2 size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(t)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
+          {canDelete && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDeleteClick(t.id)}
+              icon={<Trash2 size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
         </div>
       ),
     },
@@ -292,9 +298,11 @@ export default function TransportsPage() {
 
   const headerExtra = (
     <div style={{ display: "flex", gap: 8 }}>
-      <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
-        Nuevo transporte
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
+          Nuevo transporte
+        </Button>
+      )}
     </div>
   );
 
@@ -304,7 +312,7 @@ export default function TransportsPage() {
         title="Lista de transportes"
         loading={loading}
         data={transports}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(t) => t.id}
         emptyText="No hay transportes aún"
         headerExtra={headerExtra}

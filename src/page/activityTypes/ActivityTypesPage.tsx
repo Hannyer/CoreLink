@@ -17,6 +17,7 @@ import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus } from "lucide-react";
 import type { ActivityType, ActivityTypeFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
+import { usePermissions } from "@/hooks/usePermissions";
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string; title?: string }>;
@@ -33,6 +34,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function ActivityTypesPage() {
+  const { canWrite, canDelete } = usePermissions();
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -178,20 +180,24 @@ export default function ActivityTypesPage() {
       align: "center",
       render: (t) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(t)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDelete(t.id)}
-            icon={<Trash2 size={16} />}
-            style={{ padding: "4px 8px" }}
-          />
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(t)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
+          {canDelete && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDelete(t.id)}
+              icon={<Trash2 size={16} />}
+              style={{ padding: "4px 8px" }}
+            />
+          )}
         </div>
       ),
     },
@@ -231,9 +237,11 @@ export default function ActivityTypesPage() {
           Inactivos
         </Button>
       </div>
-      <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
-        Nuevo tipo
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
+          Nuevo tipo
+        </Button>
+      )}
     </div>
   );
 
@@ -243,7 +251,7 @@ export default function ActivityTypesPage() {
         title="Tipos de actividad"
         loading={loading}
         data={activityTypes}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(t) => t.id}
         emptyText="No hay tipos de actividad aún"
         headerExtra={headerExtra}

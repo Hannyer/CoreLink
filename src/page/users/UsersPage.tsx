@@ -22,6 +22,7 @@ import type { User, UserFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
 import { toDateInputValueOrNull, todayDateInputValue } from "@/utils/dateUtils";
 import { getLanguages, type Language } from "@/services/languageService";
+import { usePermissions } from "@/hooks/usePermissions";
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ const ROLE_ID_GUIA = "9d3372fa-7180-4f04-9727-374e9b513d53";
 // ── componente ──────────────────────────────────────────────────────
 
 export default function UsersPage() {
+  const { canWrite, canDelete } = usePermissions();
   // ── data state ──
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -361,15 +363,17 @@ export default function UsersPage() {
       align: "center",
       render: (u) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(u)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-            title="Editar"
-          />
-          {u.status && (
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(u)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+              title="Editar"
+            />
+          )}
+          {canDelete && u.status && (
             <Button
               variant="danger"
               size="sm"
@@ -436,7 +440,7 @@ export default function UsersPage() {
 
       {/* Filtro por rol */}
       <select
-        value={roleFilter ?? ""}
+         value={roleFilter ?? ""}
         onChange={(e) => {
           setRoleFilter(e.target.value || null);
           setPage(1);
@@ -462,9 +466,11 @@ export default function UsersPage() {
         ))}
       </select>
 
-      <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
-        Nuevo usuario
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreate} icon={<Plus size={18} />} size="sm">
+          Nuevo usuario
+        </Button>
+      )}
     </div>
   );
 
@@ -476,7 +482,7 @@ export default function UsersPage() {
         title="Usuarios del sistema"
         loading={loading}
         data={users}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(u) => u.id}
         emptyText="No hay usuarios registrados"
         headerExtra={headerExtra}

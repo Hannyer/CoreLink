@@ -17,6 +17,7 @@ import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus } from "lucide-react";
 import type { Company, CompanyFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
+import { usePermissions } from "@/hooks/usePermissions";
 
 /**
  * Función helper para extraer el mensaje de error del formato del API
@@ -36,6 +37,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function CompaniesPage() {
+  const { canWrite, canDelete } = usePermissions();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCompanyModal, setShowCompanyModal] = useState(false);
@@ -206,10 +208,10 @@ export default function CompaniesPage() {
           style={{
             ...badgeStyles.base,
             ...(c.status ? badgeStyles.success : badgeStyles.danger),
-            cursor: "pointer",
+            cursor: canWrite ? "pointer" : "default",
           }}
-          onClick={() => handleToggleStatus(c.id, c.status)}
-          title="Click para cambiar estado"
+          onClick={canWrite ? () => handleToggleStatus(c.id, c.status) : undefined}
+          title={canWrite ? "Click para cambiar estado" : undefined}
         >
           {c.status ? "Activa" : "Inactiva"}
         </span>
@@ -222,24 +224,28 @@ export default function CompaniesPage() {
       align: "center",
       render: (c) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEditCompany(c)}
-            icon={<Edit size={16} />}
-            style={{ padding: "4px 8px" }}
-          >
-            Editar
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDeleteCompany(c.id)}
-            icon={<Trash2 size={16} />}
-            style={{ padding: "4px 8px" }}
-          >
-            Eliminar
-          </Button>
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEditCompany(c)}
+              icon={<Edit size={16} />}
+              style={{ padding: "4px 8px" }}
+            >
+              Editar
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDeleteCompany(c.id)}
+              icon={<Trash2 size={16} />}
+              style={{ padding: "4px 8px" }}
+            >
+              Eliminar
+            </Button>
+          )}
         </div>
       ),
     },
@@ -279,9 +285,11 @@ export default function CompaniesPage() {
           Inactivas
         </Button>
       </div>
-      <Button onClick={handleCreateCompany} icon={<Plus size={18} />} size="sm">
-        Nueva compañía
-      </Button>
+      {canWrite && (
+        <Button onClick={handleCreateCompany} icon={<Plus size={18} />} size="sm">
+          Nueva compañía
+        </Button>
+      )}
     </div>
   );
 
@@ -291,7 +299,7 @@ export default function CompaniesPage() {
         title="Lista de compañías"
         loading={loading}
         data={companies}
-        columns={columns}
+        columns={columns.filter(col => col.key !== "actions" || canWrite || canDelete)}
         rowKey={(c) => c.id}
         emptyText="No hay compañías aún"
         headerExtra={headerExtra}

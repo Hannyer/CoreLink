@@ -32,7 +32,7 @@ type TableCardProps<T> = {
   hover?: boolean;
 };
 
-const wrapper: CSSProperties = { padding: "8px 12px" };
+const wrapper: CSSProperties = { padding: "8px 12px", minHeight: 0 };
 
 const card: CSSProperties = {
   background: "#ffffff",
@@ -40,6 +40,11 @@ const card: CSSProperties = {
   padding: "24px",
   boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
   border: "1px solid rgba(0,0,0,0.06)",
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 0,
+  maxHeight: "calc(100vh - 260px)",
+  overflow: "hidden",
 };
 
 const titleStyle: CSSProperties = { marginBottom: "14px", fontWeight: 600, color: "#0f172a" };
@@ -59,6 +64,9 @@ const thStyle: CSSProperties = {
   borderBottom: "2px solid #e2e8f0",
   background: "#f8fafc",
   whiteSpace: "nowrap",
+  position: "sticky",
+  top: 0,
+  zIndex: 1,
 };
 
 const tdStyle: CSSProperties = {
@@ -68,6 +76,12 @@ const tdStyle: CSSProperties = {
 };
 
 const rowHover: CSSProperties = { transition: "background 0.2s ease" };
+
+const scrollArea: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflow: "auto",
+};
 
 // Exportar badgeStyles para compatibilidad hacia atrás
 export const badgeStyles = {
@@ -143,7 +157,7 @@ export function TableCard<T>({
           <div style={{ color: "#64748b", padding: "12px 4px", textAlign: "center" }}>{emptyText}</div>
         ) : isMobile ? (
           // Vista de cards para móvil
-          <div>
+          <div style={scrollArea}>
             {data.map((row) => (
               <div key={String(rowKey(row))} style={cardMobile}>
                 {visibleColumns.map((c) => {
@@ -160,7 +174,7 @@ export function TableCard<T>({
           </div>
         ) : (
           // Vista de tabla para desktop
-          <div style={{ overflowX: "auto" }}>
+          <div style={scrollArea}>
             <table style={table}>
               <thead>
                 <tr>

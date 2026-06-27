@@ -125,7 +125,7 @@ export default function MainLayout() {
           </button>
         </div>
 
-        <nav className="mt-3 px-2">
+        <nav className="mt-3 px-2 flex-grow-1">
           <DynamicSidebarNav
             collapsed={collapsed}
             isMobile={isMobile}

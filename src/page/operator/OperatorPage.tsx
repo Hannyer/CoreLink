@@ -9,6 +9,8 @@ import {
   X,
   UserCheck,
   AlertCircle,
+  CalendarCheck,
+  Edit3,
   RefreshCw,
   Search,
   Loader2,
@@ -20,12 +22,18 @@ import {
   assignGuidesToBooking,
   assignTransportToBooking,
   confirmBooking,
+  fetchScheduleGuideAssignments,
+  fetchAvailableGuidesBySchedule,
+  assignGuidesToSchedule,
   type AvailableGuide,
+  type ScheduleGuideAssignment,
 } from "@/services/bookingAssignmentsService";
 import { fetchAvailableTransportsWithPagination } from "@/services/transportService";
 import { useToastContext } from "@/contexts/ToastContext";
 import type { Booking, BookingAssignments, Transport } from "@/types/entities";
 import type { AxiosError } from "axios";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
 
 const MAX_GUIDES = 5;
 
@@ -106,9 +114,210 @@ function GuideChip({ guide, onRemove }: { guide: AvailableGuide; onRemove: () =>
   );
 }
 
+function GuideAssignmentsSubmodule() {
+  const toast = useToastContext();
+  const [items, setItems] = useState<ScheduleGuideAssignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<ScheduleGuideAssignment | null>(null);
+  const [availableGuides, setAvailableGuides] = useState<AvailableGuide[]>([]);
+  const [selectedGuideIds, setSelectedGuideIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [loadingGuides, setLoadingGuides] = useState(false);
+
+  const loadItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      setItems(await fetchScheduleGuideAssignments());
+    } catch (e) {
+      toast.error("Error al cargar salidas con guías: " + getApiError(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  const openEdit = async (item: ScheduleGuideAssignment) => {
+    setEditing(item);
+    setSelectedGuideIds(item.guides.map((g) => g.id));
+    setLoadingGuides(true);
+    try {
+      const guides = await fetchAvailableGuidesBySchedule(item.activityScheduleId);
+      setAvailableGuides(guides);
+    } catch (e) {
+      toast.error("Error al cargar guías disponibles: " + getApiError(e));
+      setAvailableGuides([]);
+    } finally {
+      setLoadingGuides(false);
+    }
+  };
+
+  const toggleGuide = (id: string) => {
+    setSelectedGuideIds((prev) => {
+      if (prev.includes(id)) return prev.filter((guideId) => guideId !== id);
+      if (prev.length >= MAX_GUIDES) {
+        toast.error(`Máximo ${MAX_GUIDES} guías por salida`);
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const handleSave = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const updated = await assignGuidesToSchedule(editing.activityScheduleId, selectedGuideIds);
+      setItems(updated);
+      toast.success("Guías de la salida actualizados correctamente");
+      setEditing(null);
+    } catch (e) {
+      toast.error(getApiError(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatDateTime = (value: string) =>
+    value
+      ? new Date(value).toLocaleString("es-CR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "—";
+
+  return (
+    <div className="op-panel" style={{ minHeight: "calc(100vh - 260px)" }}>
+      <div className="op-panel-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+        <div>
+          <div className="op-panel-title d-flex align-items-center gap-2">
+            <CalendarCheck size={18} /> Salidas con guías asignados
+          </div>
+          <div className="op-panel-meta">
+            Consulta las actividades programadas que ya tienen guías y modifica sus asignaciones.
+          </div>
+        </div>
+        <button className="op-btn-refresh" onClick={loadItems} disabled={loading}>
+          <RefreshCw size={14} className={loading ? "spin" : ""} /> Actualizar
+        </button>
+      </div>
+
+      <div className="op-panel-body">
+        {loading ? (
+          <div className="op-empty-panel">
+            <Loader2 className="spin" size={28} />
+            <span>Cargando salidas...</span>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="op-empty-panel">
+            <CalendarCheck size={42} />
+            <span>No hay salidas con guías asignados</span>
+          </div>
+        ) : (
+          <div className="d-flex flex-column gap-3">
+            {items.map((item) => (
+              <div key={item.activityScheduleId} className="op-section-card">
+                <div className="d-flex justify-content-between gap-3 flex-wrap">
+                  <div>
+                    <div className="fw-semibold" style={{ color: "#e2e8f0" }}>
+                      {item.activityTitle}
+                    </div>
+                    <div className="op-panel-meta">
+                      {formatDateTime(item.scheduledStart)} - {formatDateTime(item.scheduledEnd)}
+                    </div>
+                    <div className="op-panel-meta">
+                      {item.bookingCount} reserva(s) · {item.totalPeople} persona(s)
+                    </div>
+                  </div>
+                  <button className="op-btn-save" onClick={() => openEdit(item)}>
+                    <Edit3 size={14} /> Modificar guías
+                  </button>
+                </div>
+
+                <div className="op-chips mt-3 mb-0">
+                  {item.guides.map((guide) => (
+                    <div key={guide.id} className="op-guide-chip">
+                      <UserCheck size={14} />
+                      <span>{guide.fullName}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Modal
+        isOpen={!!editing}
+        onClose={() => setEditing(null)}
+        title="Modificar guías de la salida"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} loading={saving} disabled={selectedGuideIds.length === 0}>
+              Guardar cambios
+            </Button>
+          </>
+        }
+      >
+        {editing && (
+          <div>
+            <div className="mb-3">
+              <div className="fw-semibold">{editing.activityTitle}</div>
+              <div className="text-muted small">
+                {formatDateTime(editing.scheduledStart)} - {formatDateTime(editing.scheduledEnd)}
+              </div>
+            </div>
+
+            {loadingGuides ? (
+              <div className="d-flex align-items-center gap-2 text-muted">
+                <Loader2 className="spin" size={18} /> Cargando guías disponibles...
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-2" style={{ maxHeight: 360, overflowY: "auto" }}>
+                {availableGuides.map((guide) => {
+                  const selected = selectedGuideIds.includes(guide.id);
+                  const disabled = !selected && selectedGuideIds.length >= MAX_GUIDES;
+                  return (
+                    <button
+                      key={guide.id}
+                      type="button"
+                      className="btn text-start d-flex justify-content-between align-items-center"
+                      style={{
+                        border: selected ? "1px solid #6366f1" : "1px solid #e2e8f0",
+                        background: selected ? "#eef2ff" : "#fff",
+                        opacity: disabled ? 0.55 : 1,
+                      }}
+                      disabled={disabled}
+                      onClick={() => toggleGuide(guide.id)}
+                    >
+                      <span>{guide.fullName}</span>
+                      {selected && <CheckCircle2 size={18} color="#4f46e5" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function OperatorPage() {
   const toast = useToastContext();
+  const [activeSubmodule, setActiveSubmodule] = useState<"assignments" | "guideDetails">("assignments");
 
   // Listado de reservas pendientes
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -119,8 +328,6 @@ export default function OperatorPage() {
   // Panel de asignación
   const [assignments, setAssignments] = useState<BookingAssignments | null>(null);
   const [loadingPanel, setLoadingPanel] = useState(false);
-  const [savingGuides, setSavingGuides] = useState(false);
-  const [savingTransport, setSavingTransport] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
   // Catálogos
@@ -145,14 +352,10 @@ export default function OperatorPage() {
     }
   }, []);
 
-  // ── Cargar catálogos (guías y transportes disponibles) ──
+  // ── Cargar catálogos generales ──
   const loadCatalogs = useCallback(async () => {
     try {
-      const [guides, transports] = await Promise.all([
-        fetchAvailableGuides(),
-        fetchAvailableTransportsWithPagination(1, 200),
-      ]);
-      setAvailableGuides(guides);
+      const transports = await fetchAvailableTransportsWithPagination(1, 100);
       setAvailableTransports(transports.items);
     } catch (e) {
       toast.error("Error al cargar catálogos: " + getApiError(e));
@@ -170,8 +373,12 @@ export default function OperatorPage() {
     setLoadingPanel(true);
     setGuideSearch("");
     try {
-      const current = await getBookingAssignments(booking.id);
+      const [current, guides] = await Promise.all([
+        getBookingAssignments(booking.id),
+        fetchAvailableGuides(booking.id),
+      ]);
       setAssignments(current);
+      setAvailableGuides(guides);
       setSelectedGuideIds(current.guides.map((g) => g.id));
       setSelectedTransportId(current.transport?.id || "");
     } catch (e) {
@@ -182,44 +389,17 @@ export default function OperatorPage() {
     }
   };
 
-  // ── Guardar guías ──
-  const handleSaveGuides = async () => {
-    if (!selectedBooking) return;
-    setSavingGuides(true);
-    try {
-      const updated = await assignGuidesToBooking(selectedBooking.id, selectedGuideIds);
-      setAssignments(updated);
-      toast.success("Guías asignados correctamente");
-    } catch (e) {
-      toast.error(getApiError(e));
-    } finally {
-      setSavingGuides(false);
-    }
-  };
-
-  // ── Guardar transporte ──
-  const handleSaveTransport = async () => {
-    if (!selectedBooking) return;
-    setSavingTransport(true);
-    try {
-      const updated = await assignTransportToBooking(
-        selectedBooking.id,
-        selectedTransportId || null
-      );
-      setAssignments(updated);
-      toast.success("Transporte asignado correctamente");
-    } catch (e) {
-      toast.error(getApiError(e));
-    } finally {
-      setSavingTransport(false);
-    }
-  };
-
   // ── Confirmar reserva ──
   const handleConfirm = async () => {
     if (!selectedBooking) return;
     setConfirming(true);
     try {
+      await assignGuidesToBooking(selectedBooking.id, selectedGuideIds);
+
+      if (selectedBooking.transport) {
+        await assignTransportToBooking(selectedBooking.id, selectedTransportId || null);
+      }
+
       await confirmBooking(selectedBooking.id);
       toast.success("✅ Reserva confirmada exitosamente");
       setSelectedBooking(null);
@@ -271,6 +451,10 @@ export default function OperatorPage() {
         .op-header { margin-bottom: 1.5rem; }
         .op-title { font-size: 1.5rem; font-weight: 700; color: #e2e8f0; display: flex; align-items: center; gap: .6rem; }
         .op-subtitle { color: #94a3b8; font-size: .875rem; margin-top: .2rem; }
+        .op-tabs { display: inline-flex; gap: .4rem; padding: .25rem; border-radius: 10px; background: rgba(15,23,42,.65); border: 1px solid rgba(255,255,255,.08); }
+        .op-tab { border: 0; border-radius: 8px; background: transparent; color: #94a3b8; padding: .45rem .8rem; font-size: .85rem; display: inline-flex; align-items: center; gap: .4rem; }
+        .op-tab:hover { color: #e2e8f0; background: rgba(255,255,255,.06); }
+        .op-tab--active { color: #fff; background: rgba(99,102,241,.35); }
 
         .op-layout { display: grid; grid-template-columns: 380px 1fr; gap: 1.25rem; height: calc(100vh - 220px); min-height: 500px; }
         @media (max-width: 900px) { .op-layout { grid-template-columns: 1fr; height: auto; } }
@@ -362,7 +546,7 @@ export default function OperatorPage() {
           <div>
             <div className="op-title">
               <ClipboardCheck size={24} />
-              Gestión Operativa
+              Gestión de Operaciones
             </div>
             <div className="op-subtitle">
               Asigna guías y transporte a las reservas pendientes para confirmarlas
@@ -373,9 +557,26 @@ export default function OperatorPage() {
             Actualizar
           </button>
         </div>
+        <div className="op-tabs mt-3">
+          <button
+            className={`op-tab ${activeSubmodule === "assignments" ? "op-tab--active" : ""}`}
+            onClick={() => setActiveSubmodule("assignments")}
+          >
+            <ClipboardCheck size={15} /> Asignaciones
+          </button>
+          <button
+            className={`op-tab ${activeSubmodule === "guideDetails" ? "op-tab--active" : ""}`}
+            onClick={() => setActiveSubmodule("guideDetails")}
+          >
+            <CalendarCheck size={15} /> Guías por salida
+          </button>
+        </div>
       </div>
 
       {/* ─── Layout principal ────────────────────────────────────────── */}
+      {activeSubmodule === "guideDetails" ? (
+        <GuideAssignmentsSubmodule />
+      ) : (
       <div className="op-layout">
         {/* ─── Panel izquierdo: lista de reservas ─── */}
         <div className="op-list-panel">
@@ -562,16 +763,9 @@ export default function OperatorPage() {
                       )}
                     </div>
 
-                    {/* Botón guardar guías */}
-                    <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,.07)" }}>
-                      <button
-                        className="op-btn-save"
-                        onClick={handleSaveGuides}
-                        disabled={savingGuides}
-                      >
-                        {savingGuides ? <Loader2 size={14} className="spin" /> : <UserCheck size={14} />}
-                        {savingGuides ? "Guardando…" : "Guardar guías"}
-                      </button>
+                    <div className="op-info-strip mt-2">
+                      <UserCheck size={13} />
+                      Los guías seleccionados se guardarán al confirmar la reserva.
                     </div>
                   </div>
                 </div>
@@ -603,14 +797,10 @@ export default function OperatorPage() {
                         </div>
                       )}
 
-                      <button
-                        className="op-btn-save"
-                        onClick={handleSaveTransport}
-                        disabled={savingTransport}
-                      >
-                        {savingTransport ? <Loader2 size={14} className="spin" /> : <BusFront size={14} />}
-                        {savingTransport ? "Guardando…" : "Guardar transporte"}
-                      </button>
+                      <div className="op-info-strip">
+                        <BusFront size={13} />
+                        El transporte seleccionado se guardará al confirmar la reserva.
+                      </div>
                     </div>
                   </div>
                 )}
@@ -647,6 +837,7 @@ export default function OperatorPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Animación spinner */}
       <style>{`

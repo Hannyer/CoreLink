@@ -34,6 +34,17 @@ export interface ConfirmBookingResult {
   } | null;
 }
 
+export interface ScheduleGuideAssignment {
+  activityScheduleId: string;
+  activityId: string;
+  activityTitle: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  bookingCount: number;
+  totalPeople: number;
+  guides: BookingGuideAssignment[];
+}
+
 // ============================================
 // Helpers de mapeo
 // ============================================
@@ -73,8 +84,10 @@ function mapAssignments(data: any): BookingAssignments {
 /**
  * Lista los usuarios con rol Guía disponibles para asignar
  */
-export async function fetchAvailableGuides(): Promise<AvailableGuide[]> {
-  const { data } = await api.get<any[]>("/api/booking-assignments/guides/available");
+export async function fetchAvailableGuides(bookingId?: string): Promise<AvailableGuide[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/guides/available", {
+    params: bookingId ? { bookingId } : undefined,
+  });
   return (data || []).map((g: any) => ({
     id: g.id,
     fullName: g.fullName || g.full_name || "",
@@ -83,6 +96,73 @@ export async function fetchAvailableGuides(): Promise<AvailableGuide[]> {
     status: g.status ?? true,
     speaksEnglish: g.speaksEnglish ?? g.speaks_english ?? false,
     languages: g.languages || [],
+  }));
+}
+
+export async function fetchScheduleGuideAssignments(): Promise<ScheduleGuideAssignment[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/schedules/guides");
+  return (data || []).map((item: any) => ({
+    activityScheduleId: item.activityScheduleId,
+    activityId: item.activityId,
+    activityTitle: item.activityTitle || "",
+    scheduledStart: item.scheduledStart || "",
+    scheduledEnd: item.scheduledEnd || "",
+    bookingCount: Number(item.bookingCount || 0),
+    totalPeople: Number(item.totalPeople || 0),
+    guides: (item.guides || []).map((g: any) => ({
+      assignmentId: g.assignmentId || "",
+      id: g.id,
+      fullName: g.fullName || g.full_name || "",
+      email: g.email ?? undefined,
+      phone: g.phone ?? undefined,
+      status: g.status ?? true,
+      assignedAt: g.assignedAt || "",
+    })),
+  }));
+}
+
+export async function fetchAvailableGuidesBySchedule(
+  activityScheduleId: string
+): Promise<AvailableGuide[]> {
+  const { data } = await api.get<any[]>(
+    `/api/booking-assignments/schedules/${activityScheduleId}/guides/available`
+  );
+  return (data || []).map((g: any) => ({
+    id: g.id,
+    fullName: g.fullName || g.full_name || "",
+    email: g.email ?? undefined,
+    phone: g.phone ?? undefined,
+    status: g.status ?? true,
+    speaksEnglish: g.speaksEnglish ?? g.speaks_english ?? false,
+    languages: g.languages || [],
+  }));
+}
+
+export async function assignGuidesToSchedule(
+  activityScheduleId: string,
+  guideIds: string[]
+): Promise<ScheduleGuideAssignment[]> {
+  const { data } = await api.put<any[]>(
+    `/api/booking-assignments/schedules/${activityScheduleId}/guides`,
+    { guideIds }
+  );
+  return (data || []).map((item: any) => ({
+    activityScheduleId: item.activityScheduleId,
+    activityId: item.activityId,
+    activityTitle: item.activityTitle || "",
+    scheduledStart: item.scheduledStart || "",
+    scheduledEnd: item.scheduledEnd || "",
+    bookingCount: Number(item.bookingCount || 0),
+    totalPeople: Number(item.totalPeople || 0),
+    guides: (item.guides || []).map((g: any) => ({
+      assignmentId: g.assignmentId || "",
+      id: g.id,
+      fullName: g.fullName || g.full_name || "",
+      email: g.email ?? undefined,
+      phone: g.phone ?? undefined,
+      status: g.status ?? true,
+      assignedAt: g.assignedAt || "",
+    })),
   }));
 }
 

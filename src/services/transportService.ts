@@ -71,8 +71,9 @@ export async function fetchAvailableTransportsWithPagination(
   page: number = 1,
   limit: number = 10
 ): Promise<PaginatedResponse<Transport>> {
+  const safeLimit = Math.min(limit, 100);
   const { data } = await api.get<any>("/api/transport/available", {
-    params: { page, limit },
+    params: { page, limit: safeLimit },
   });
   
   // Mapear la respuesta del API al formato PaginatedResponse
@@ -81,7 +82,7 @@ export async function fetchAvailableTransportsWithPagination(
       items: data.items.map(mapApiTransportToTransport),
       total: data.pagination?.total || data.total || 0,
       page: data.pagination?.page || data.page || page,
-      pageSize: data.pagination?.limit || data.limit || data.pageSize || limit,
+      pageSize: data.pagination?.limit || data.limit || data.pageSize || safeLimit,
       totalPages: data.pagination?.totalPages || data.totalPages || 1,
     };
   }
@@ -91,7 +92,7 @@ export async function fetchAvailableTransportsWithPagination(
     items: [],
     total: 0,
     page: page,
-    pageSize: limit,
+    pageSize: safeLimit,
     totalPages: 0,
   };
 }

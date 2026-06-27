@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock,
   ChevronRight,
-  X,
   UserCheck,
   AlertCircle,
   CalendarCheck,
@@ -17,16 +16,16 @@ import {
 } from "lucide-react";
 import { fetchBookingsWithPagination } from "@/services/bookingsService";
 import {
-  fetchAvailableGuides,
   getBookingAssignments,
-  assignGuidesToBooking,
   assignTransportToBooking,
   confirmBooking,
   fetchScheduleGuideAssignments,
   fetchAvailableGuidesBySchedule,
   assignGuidesToSchedule,
+  fetchBookingTransportAssignments,
   type AvailableGuide,
   type ScheduleGuideAssignment,
+  type BookingTransportAssignment,
 } from "@/services/bookingAssignmentsService";
 import { fetchAvailableTransportsWithPagination } from "@/services/transportService";
 import { useToastContext } from "@/contexts/ToastContext";
@@ -101,26 +100,14 @@ function BookingCard({
   );
 }
 
-// ─── Chip de guía seleccionado ────────────────────────────────────────────────
-function GuideChip({ guide, onRemove }: { guide: AvailableGuide; onRemove: () => void }) {
-  return (
-    <div className="op-guide-chip">
-      <UserCheck size={14} />
-      <span>{guide.fullName}</span>
-      <button className="op-chip-remove" onClick={onRemove} title="Quitar guía">
-        <X size={12} />
-      </button>
-    </div>
-  );
-}
-
-function GuideAssignmentsSubmodule() {
+function GuideAssignmentsSubmodule({ mode }: { mode: "assign" | "edit" }) {
   const toast = useToastContext();
   const [items, setItems] = useState<ScheduleGuideAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<ScheduleGuideAssignment | null>(null);
   const [availableGuides, setAvailableGuides] = useState<AvailableGuide[]>([]);
   const [selectedGuideIds, setSelectedGuideIds] = useState<string[]>([]);
+  const [guideSearch, setGuideSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadingGuides, setLoadingGuides] = useState(false);
 
@@ -142,6 +129,7 @@ function GuideAssignmentsSubmodule() {
   const openEdit = async (item: ScheduleGuideAssignment) => {
     setEditing(item);
     setSelectedGuideIds(item.guides.map((g) => g.id));
+    setGuideSearch("");
     setLoadingGuides(true);
     try {
       const guides = await fetchAvailableGuidesBySchedule(item.activityScheduleId);
@@ -191,15 +179,25 @@ function GuideAssignmentsSubmodule() {
         })
       : "—";
 
+  const visibleItems = items.filter((item) =>
+    mode === "assign" ? item.guides.length === 0 : item.guides.length > 0
+  );
+  const isAssignMode = mode === "assign";
+  const filteredGuides = availableGuides.filter((guide) =>
+    guide.fullName.toLowerCase().includes(guideSearch.trim().toLowerCase())
+  );
+
   return (
     <div className="op-panel" style={{ minHeight: "calc(100vh - 260px)" }}>
       <div className="op-panel-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
         <div>
           <div className="op-panel-title d-flex align-items-center gap-2">
-            <CalendarCheck size={18} /> Salidas con guías asignados
+            <CalendarCheck size={18} /> {isAssignMode ? "Asignar guías a actividades programadas" : "Modificar guías asignados"}
           </div>
           <div className="op-panel-meta">
-            Consulta las actividades programadas que ya tienen guías y modifica sus asignaciones.
+            {isAssignMode
+              ? "Selecciona salidas pendientes de guía y asigna el equipo correspondiente."
+              : "Consulta las actividades programadas que ya tienen guías y modifica sus asignaciones."}
           </div>
         </div>
         <button className="op-btn-refresh" onClick={loadItems} disabled={loading}>
@@ -213,14 +211,14 @@ function GuideAssignmentsSubmodule() {
             <Loader2 className="spin" size={28} />
             <span>Cargando salidas...</span>
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="op-empty-panel">
             <CalendarCheck size={42} />
-            <span>No hay salidas con guías asignados</span>
+            <span>{isAssignMode ? "No hay salidas pendientes de guías" : "No hay salidas con guías asignados"}</span>
           </div>
         ) : (
           <div className="d-flex flex-column gap-3">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <div key={item.activityScheduleId} className="op-section-card">
                 <div className="d-flex justify-content-between gap-3 flex-wrap">
                   <div>
@@ -235,18 +233,24 @@ function GuideAssignmentsSubmodule() {
                     </div>
                   </div>
                   <button className="op-btn-save" onClick={() => openEdit(item)}>
-                    <Edit3 size={14} /> Modificar guías
+                    <Edit3 size={14} /> {isAssignMode ? "Asignar guías" : "Modificar guías"}
                   </button>
                 </div>
 
-                <div className="op-chips mt-3 mb-0">
-                  {item.guides.map((guide) => (
-                    <div key={guide.id} className="op-guide-chip">
-                      <UserCheck size={14} />
-                      <span>{guide.fullName}</span>
-                    </div>
-                  ))}
-                </div>
+                {item.guides.length > 0 ? (
+                  <div className="op-chips mt-3 mb-0">
+                    {item.guides.map((guide) => (
+                      <div key={guide.id} className="op-guide-chip">
+                        <UserCheck size={14} />
+                        <span>{guide.fullName}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="op-warn-strip mt-3">
+                    <AlertCircle size={14} /> Sin guías asignados
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -255,12 +259,22 @@ function GuideAssignmentsSubmodule() {
 
       <Modal
         isOpen={!!editing}
-        onClose={() => setEditing(null)}
-        title="Modificar guías de la salida"
+        onClose={() => {
+          setEditing(null);
+          setGuideSearch("");
+        }}
+        title={isAssignMode ? "Asignar guías a la salida" : "Modificar guías de la salida"}
         size="lg"
         footer={
           <>
-            <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditing(null);
+                setGuideSearch("");
+              }}
+              disabled={saving}
+            >
               Cancelar
             </Button>
             <Button onClick={handleSave} loading={saving} disabled={selectedGuideIds.length === 0}>
@@ -283,30 +297,210 @@ function GuideAssignmentsSubmodule() {
                 <Loader2 className="spin" size={18} /> Cargando guías disponibles...
               </div>
             ) : (
-              <div className="d-flex flex-column gap-2" style={{ maxHeight: 360, overflowY: "auto" }}>
-                {availableGuides.map((guide) => {
-                  const selected = selectedGuideIds.includes(guide.id);
-                  const disabled = !selected && selectedGuideIds.length >= MAX_GUIDES;
-                  return (
-                    <button
-                      key={guide.id}
-                      type="button"
-                      className="btn text-start d-flex justify-content-between align-items-center"
-                      style={{
-                        border: selected ? "1px solid #6366f1" : "1px solid #e2e8f0",
-                        background: selected ? "#eef2ff" : "#fff",
-                        opacity: disabled ? 0.55 : 1,
-                      }}
-                      disabled={disabled}
-                      onClick={() => toggleGuide(guide.id)}
-                    >
-                      <span>{guide.fullName}</span>
-                      {selected && <CheckCircle2 size={18} color="#4f46e5" />}
-                    </button>
-                  );
-                })}
-              </div>
+              <>
+                <div className="position-relative mb-3">
+                  <Search
+                    size={15}
+                    className="position-absolute"
+                    style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#64748b" }}
+                  />
+                  <input
+                    type="text"
+                    className="form-control"
+                    style={{ paddingLeft: "2.25rem" }}
+                    placeholder="Buscar guía por nombre..."
+                    value={guideSearch}
+                    onChange={(e) => setGuideSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="d-flex flex-column gap-2" style={{ maxHeight: 360, overflowY: "auto" }}>
+                  {filteredGuides.length === 0 ? (
+                    <div className="text-muted small text-center py-3">
+                      No hay guías que coincidan con la búsqueda.
+                    </div>
+                  ) : (
+                    filteredGuides.map((guide) => {
+                      const selected = selectedGuideIds.includes(guide.id);
+                      const disabled = !selected && selectedGuideIds.length >= MAX_GUIDES;
+                      return (
+                        <button
+                          key={guide.id}
+                          type="button"
+                          className="btn text-start d-flex justify-content-between align-items-center"
+                          style={{
+                            border: selected ? "1px solid #6366f1" : "1px solid #e2e8f0",
+                            background: selected ? "#eef2ff" : "#fff",
+                            opacity: disabled ? 0.55 : 1,
+                          }}
+                          disabled={disabled}
+                          onClick={() => toggleGuide(guide.id)}
+                        >
+                          <span>{guide.fullName}</span>
+                          {selected && <CheckCircle2 size={18} color="#4f46e5" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
             )}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function TransportAssignmentsSubmodule() {
+  const toast = useToastContext();
+  const [items, setItems] = useState<BookingTransportAssignment[]>([]);
+  const [transports, setTransports] = useState<Transport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<BookingTransportAssignment | null>(null);
+  const [selectedTransportId, setSelectedTransportId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const loadItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [assigned, available] = await Promise.all([
+        fetchBookingTransportAssignments(),
+        fetchAvailableTransportsWithPagination(1, 100),
+      ]);
+      setItems(assigned);
+      setTransports(available.items);
+    } catch (e) {
+      toast.error("Error al cargar transportes asignados: " + getApiError(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  const openEdit = (item: BookingTransportAssignment) => {
+    setEditing(item);
+    setSelectedTransportId(item.transportId);
+  };
+
+  const handleSave = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await assignTransportToBooking(editing.bookingId, selectedTransportId || null);
+      toast.success("Transporte de la reservación actualizado correctamente");
+      setEditing(null);
+      await loadItems();
+    } catch (e) {
+      toast.error(getApiError(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatDateTime = (value: string) =>
+    value
+      ? new Date(value).toLocaleString("es-CR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "—";
+
+  return (
+    <div className="op-panel" style={{ minHeight: "calc(100vh - 260px)" }}>
+      <div className="op-panel-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+        <div>
+          <div className="op-panel-title d-flex align-items-center gap-2">
+            <BusFront size={18} /> Reservaciones con transporte asignado
+          </div>
+          <div className="op-panel-meta">
+            Consulta y modifica el transporte asignado a cada reservación.
+          </div>
+        </div>
+        <button className="op-btn-refresh" onClick={loadItems} disabled={loading}>
+          <RefreshCw size={14} className={loading ? "spin" : ""} /> Actualizar
+        </button>
+      </div>
+
+      <div className="op-panel-body">
+        {loading ? (
+          <div className="op-empty-panel">
+            <Loader2 className="spin" size={28} />
+            <span>Cargando reservaciones...</span>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="op-empty-panel">
+            <BusFront size={42} />
+            <span>No hay reservaciones con transporte asignado</span>
+          </div>
+        ) : (
+          <div className="d-flex flex-column gap-3">
+            {items.map((item) => (
+              <div key={item.bookingId} className="op-section-card">
+                <div className="d-flex justify-content-between gap-3 flex-wrap">
+                  <div>
+                    <div className="fw-semibold" style={{ color: "#e2e8f0" }}>
+                      {item.activityTitle}
+                    </div>
+                    <div className="op-panel-meta">{formatDateTime(item.scheduledStart)}</div>
+                    <div className="op-panel-meta">
+                      {item.customerName} · {item.numberOfPeople} persona(s)
+                    </div>
+                    <div className="op-info-strip mt-2">
+                      <BusFront size={13} /> {item.model} · {item.licensePlate} · Cap. {item.capacity}
+                    </div>
+                  </div>
+                  <button className="op-btn-save" onClick={() => openEdit(item)}>
+                    <Edit3 size={14} /> Modificar transporte
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Modal
+        isOpen={!!editing}
+        onClose={() => setEditing(null)}
+        title="Modificar transporte de la reservación"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} loading={saving} disabled={!selectedTransportId}>
+              Guardar cambios
+            </Button>
+          </>
+        }
+      >
+        {editing && (
+          <div>
+            <div className="mb-3">
+              <div className="fw-semibold">{editing.activityTitle}</div>
+              <div className="text-muted small">
+                {editing.customerName} · {formatDateTime(editing.scheduledStart)}
+              </div>
+            </div>
+            <select
+              className="form-select"
+              value={selectedTransportId}
+              onChange={(e) => setSelectedTransportId(e.target.value)}
+            >
+              <option value="">Seleccionar transporte</option>
+              {transports.map((transport) => (
+                <option key={transport.id} value={transport.id}>
+                  {transport.model} · {transport.licensePlate} · Cap. {transport.capacity}
+                </option>
+              ))}
+            </select>
           </div>
         )}
       </Modal>
@@ -317,7 +511,7 @@ function GuideAssignmentsSubmodule() {
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function OperatorPage() {
   const toast = useToastContext();
-  const [activeSubmodule, setActiveSubmodule] = useState<"assignments" | "guideDetails">("assignments");
+  const [activeSubmodule, setActiveSubmodule] = useState<"guideAssign" | "assignments" | "guideDetails" | "transportDetails">("guideAssign");
 
   // Listado de reservas pendientes
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -331,13 +525,10 @@ export default function OperatorPage() {
   const [confirming, setConfirming] = useState(false);
 
   // Catálogos
-  const [availableGuides, setAvailableGuides] = useState<AvailableGuide[]>([]);
   const [availableTransports, setAvailableTransports] = useState<Transport[]>([]);
 
   // Selecciones en el panel
-  const [selectedGuideIds, setSelectedGuideIds] = useState<string[]>([]);
   const [selectedTransportId, setSelectedTransportId] = useState<string>("");
-  const [guideSearch, setGuideSearch] = useState("");
 
   // ── Cargar reservas pendientes ──
   const loadBookings = useCallback(async () => {
@@ -371,15 +562,9 @@ export default function OperatorPage() {
   const handleSelectBooking = async (booking: Booking) => {
     setSelectedBooking(booking);
     setLoadingPanel(true);
-    setGuideSearch("");
     try {
-      const [current, guides] = await Promise.all([
-        getBookingAssignments(booking.id),
-        fetchAvailableGuides(booking.id),
-      ]);
+      const current = await getBookingAssignments(booking.id);
       setAssignments(current);
-      setAvailableGuides(guides);
-      setSelectedGuideIds(current.guides.map((g) => g.id));
       setSelectedTransportId(current.transport?.id || "");
     } catch (e) {
       toast.error("Error al cargar asignaciones: " + getApiError(e));
@@ -394,8 +579,6 @@ export default function OperatorPage() {
     if (!selectedBooking) return;
     setConfirming(true);
     try {
-      await assignGuidesToBooking(selectedBooking.id, selectedGuideIds);
-
       if (selectedBooking.transport) {
         await assignTransportToBooking(selectedBooking.id, selectedTransportId || null);
       }
@@ -412,18 +595,6 @@ export default function OperatorPage() {
     }
   };
 
-  // ── Agregar / quitar guía de selección ──
-  const toggleGuide = (id: string) => {
-    setSelectedGuideIds((prev) => {
-      if (prev.includes(id)) return prev.filter((g) => g !== id);
-      if (prev.length >= MAX_GUIDES) {
-        toast.error(`Máximo ${MAX_GUIDES} guías por reserva`);
-        return prev;
-      }
-      return [...prev, id];
-    });
-  };
-
   // ── Filtros ──
   const filteredBookings = bookings.filter((b) =>
     [b.customerName, b.activityTitle, b.companyName]
@@ -431,18 +602,11 @@ export default function OperatorPage() {
       .includes(searchTerm.toLowerCase())
   );
 
-  const filteredGuides = availableGuides.filter((g) =>
-    g.fullName.toLowerCase().includes(guideSearch.toLowerCase())
-  );
-
   // ── ¿Se puede confirmar? ──
   const canConfirm =
     selectedBooking &&
-    selectedGuideIds.length > 0 &&
+    (assignments?.guides.length ?? 0) > 0 &&
     (!selectedBooking.transport || !!selectedTransportId);
-
-  // ── Guía seleccionado como objeto ──
-  const selectedGuides = availableGuides.filter((g) => selectedGuideIds.includes(g.id));
 
   return (
     <>
@@ -549,7 +713,7 @@ export default function OperatorPage() {
               Gestión de Operaciones
             </div>
             <div className="op-subtitle">
-              Asigna guías y transporte a las reservas pendientes para confirmarlas
+              Asigna guías por actividad programada, transporte por reservación y confirma reservas
             </div>
           </div>
           <button className="op-btn-refresh" onClick={loadBookings} disabled={loadingBookings}>
@@ -558,6 +722,12 @@ export default function OperatorPage() {
           </button>
         </div>
         <div className="op-tabs mt-3">
+          <button
+            className={`op-tab ${activeSubmodule === "guideAssign" ? "op-tab--active" : ""}`}
+            onClick={() => setActiveSubmodule("guideAssign")}
+          >
+            <CalendarCheck size={15} /> Guías a actividades
+          </button>
           <button
             className={`op-tab ${activeSubmodule === "assignments" ? "op-tab--active" : ""}`}
             onClick={() => setActiveSubmodule("assignments")}
@@ -568,14 +738,24 @@ export default function OperatorPage() {
             className={`op-tab ${activeSubmodule === "guideDetails" ? "op-tab--active" : ""}`}
             onClick={() => setActiveSubmodule("guideDetails")}
           >
-            <CalendarCheck size={15} /> Guías por salida
+            <CalendarCheck size={15} /> Modificar guías
+          </button>
+          <button
+            className={`op-tab ${activeSubmodule === "transportDetails" ? "op-tab--active" : ""}`}
+            onClick={() => setActiveSubmodule("transportDetails")}
+          >
+            <BusFront size={15} /> Modificar transportes
           </button>
         </div>
       </div>
 
       {/* ─── Layout principal ────────────────────────────────────────── */}
-      {activeSubmodule === "guideDetails" ? (
-        <GuideAssignmentsSubmodule />
+      {activeSubmodule === "guideAssign" ? (
+        <GuideAssignmentsSubmodule mode="assign" />
+      ) : activeSubmodule === "guideDetails" ? (
+        <GuideAssignmentsSubmodule mode="edit" />
+      ) : activeSubmodule === "transportDetails" ? (
+        <TransportAssignmentsSubmodule />
       ) : (
       <div className="op-layout">
         {/* ─── Panel izquierdo: lista de reservas ─── */}
@@ -677,7 +857,7 @@ export default function OperatorPage() {
                 <div className="mt-2 d-flex flex-column gap-1">
                   <div className="op-info-strip">
                     <Users size={14} />
-                    Asigna de 1 a {MAX_GUIDES} guías. Actualmente: <strong>{selectedGuideIds.length}</strong> seleccionado{selectedGuideIds.length !== 1 ? "s" : ""}
+                    Los guías se asignan por salida en el submódulo Guías por salida. Actualmente: <strong>{assignments?.guides.length ?? 0}</strong> guía{(assignments?.guides.length ?? 0) !== 1 ? "s" : ""}
                   </div>
                   {selectedBooking.transport && !selectedTransportId && (
                     <div className="op-warn-strip">
@@ -692,80 +872,27 @@ export default function OperatorPage() {
                 {/* ── Sección Guías ── */}
                 <div>
                   <div className="op-section-title">
-                    <UserCheck size={15} /> Guías Asignados
-                    <span className="op-max-label ms-auto">Máx. {MAX_GUIDES}</span>
+                    <UserCheck size={15} /> Guías de la salida
                   </div>
                   <div className="op-section-card">
-                    {/* Chips de seleccionados */}
-                    {selectedGuides.length > 0 && (
+                    {assignments?.guides.length ? (
                       <div className="op-chips">
-                        {selectedGuides.map((g) => (
-                          <GuideChip
-                            key={g.id}
-                            guide={g}
-                            onRemove={() => toggleGuide(g.id)}
-                          />
+                        {assignments.guides.map((guide) => (
+                          <div key={guide.id} className="op-guide-chip">
+                            <UserCheck size={14} />
+                            <span>{guide.fullName}</span>
+                          </div>
                         ))}
                       </div>
-                    )}
-
-                    {/* Buscador de guías */}
-                    <div className="position-relative mb-2">
-                      <Search
-                        size={13}
-                        className="position-absolute"
-                        style={{ left: 8, top: "50%", transform: "translateY(-50%)", color: "#64748b" }}
-                      />
-                      <input
-                        type="text"
-                        className="op-search"
-                        style={{ paddingLeft: "1.75rem", fontSize: ".8rem", padding: ".35rem .65rem .35rem 1.75rem" }}
-                        placeholder="Buscar guía…"
-                        value={guideSearch}
-                        onChange={(e) => setGuideSearch(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Lista de guías disponibles */}
-                    <div className="op-guide-list">
-                      {filteredGuides.length === 0 ? (
-                        <div className="op-empty" style={{ minHeight: 60 }}>
-                          <span>No hay guías disponibles</span>
-                        </div>
-                      ) : (
-                        filteredGuides.map((g) => {
-                          const isSelected = selectedGuideIds.includes(g.id);
-                          const isDisabled = !isSelected && selectedGuideIds.length >= MAX_GUIDES;
-                          const langs = g.languages?.map((l) => l.code).join(", ") || "";
-                          return (
-                            <div
-                              key={g.id}
-                              className={`op-guide-item ${isSelected ? "op-guide-item--selected" : ""} ${isDisabled ? "op-guide-item--disabled" : ""}`}
-                              onClick={() => !isDisabled && toggleGuide(g.id)}
-                              role="checkbox"
-                              aria-checked={isSelected}
-                              tabIndex={0}
-                              onKeyDown={(e) => e.key === " " && !isDisabled && toggleGuide(g.id)}
-                            >
-                              <div className="op-guide-check">
-                                {isSelected && <CheckCircle2 size={10} color="#fff" />}
-                              </div>
-                              <span>{g.fullName}</span>
-                              {g.speaksEnglish && (
-                                <span className="op-guide-lang">🇬🇧 EN</span>
-                              )}
-                              {langs && !g.speaksEnglish && (
-                                <span className="op-guide-lang">{langs}</span>
-                              )}
-                            </div>
-                          );
-                        })
+                    ) : (
+                      <div className="op-warn-strip">
+                        <AlertCircle size={14} /> Esta salida todavía no tiene guías asignados.
+                      </div>
                       )}
-                    </div>
 
                     <div className="op-info-strip mt-2">
                       <UserCheck size={13} />
-                      Los guías seleccionados se guardarán al confirmar la reserva.
+                      Para modificar guías usa el submódulo Guías por salida.
                     </div>
                   </div>
                 </div>
@@ -809,9 +936,9 @@ export default function OperatorPage() {
               {/* ── Footer: botón Confirmar ── */}
               <div className="op-panel-footer">
                 <div className="d-flex flex-column" style={{ fontSize: ".78rem", color: "#64748b" }}>
-                  {selectedGuideIds.length === 0 && (
+                  {(assignments?.guides.length ?? 0) === 0 && (
                     <span className="d-flex align-items-center gap-1">
-                      <AlertCircle size={12} color="#fbbf24" /> Asigna al menos 1 guía
+                      <AlertCircle size={12} color="#fbbf24" /> Asigna al menos 1 guía a la salida
                     </span>
                   )}
                   {selectedBooking.transport && !selectedTransportId && (

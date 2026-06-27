@@ -45,6 +45,23 @@ export interface ScheduleGuideAssignment {
   guides: BookingGuideAssignment[];
 }
 
+export interface BookingTransportAssignment {
+  bookingId: string;
+  customerName: string;
+  numberOfPeople: number;
+  status: string;
+  activityTitle: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  assignmentId: string;
+  transportId: string;
+  model: string;
+  capacity: number;
+  licensePlate: string;
+  operationalStatus: boolean;
+  assignedAt: string;
+}
+
 // ============================================
 // Helpers de mapeo
 // ============================================
@@ -163,6 +180,26 @@ export async function assignGuidesToSchedule(
       status: g.status ?? true,
       assignedAt: g.assignedAt || "",
     })),
+  }));
+}
+
+export async function fetchBookingTransportAssignments(): Promise<BookingTransportAssignment[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/transports/assigned");
+  return (data || []).map((item: any) => ({
+    bookingId: item.bookingId,
+    customerName: item.customerName || "",
+    numberOfPeople: Number(item.numberOfPeople || 0),
+    status: item.status || "",
+    activityTitle: item.activityTitle || "",
+    scheduledStart: item.scheduledStart || "",
+    scheduledEnd: item.scheduledEnd || "",
+    assignmentId: item.assignmentId || "",
+    transportId: item.transportId || "",
+    model: item.model || "",
+    capacity: Number(item.capacity || 0),
+    licensePlate: item.licensePlate || "",
+    operationalStatus: item.operationalStatus ?? true,
+    assignedAt: item.assignedAt || "",
   }));
 }
 

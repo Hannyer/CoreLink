@@ -741,6 +741,8 @@ export interface BookingTransportAssignment {
   licensePlate: string;
   operationalStatus: boolean;
   assignedAt: string;
+  driverId?: string;
+  driverName?: string;
 }
 
 export interface BookingAssignments {

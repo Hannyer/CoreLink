@@ -19,6 +19,14 @@ export interface AvailableGuide {
   languages?: Array<{ id: string; code: string; name: string }>;
 }
 
+export interface AvailableDriver {
+  id: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  status: boolean;
+}
+
 export interface ConfirmBookingResult {
   id: string;
   status: string;
@@ -60,6 +68,8 @@ export interface BookingTransportAssignment {
   licensePlate: string;
   operationalStatus: boolean;
   assignedAt: string;
+  driverId?: string;
+  driverName?: string;
 }
 
 // ============================================
@@ -89,6 +99,8 @@ function mapAssignments(data: any): BookingAssignments {
           operationalStatus:
             data.transport.operationalStatus ?? data.transport.operational_status ?? true,
           assignedAt: data.transport.assignedAt || "",
+          driverId: data.transport.driverId ?? undefined,
+          driverName: data.transport.driverName ?? undefined,
         }
       : null,
   };
@@ -113,6 +125,17 @@ export async function fetchAvailableGuides(bookingId?: string): Promise<Availabl
     status: g.status ?? true,
     speaksEnglish: g.speaksEnglish ?? g.speaks_english ?? false,
     languages: g.languages || [],
+  }));
+}
+
+export async function fetchAvailableDrivers(): Promise<AvailableDriver[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/drivers/available");
+  return (data || []).map((d: any) => ({
+    id: d.id,
+    fullName: d.fullName || d.full_name || "",
+    email: d.email ?? undefined,
+    phone: d.phone ?? undefined,
+    status: d.status ?? true,
   }));
 }
 
@@ -200,6 +223,8 @@ export async function fetchBookingTransportAssignments(): Promise<BookingTranspo
     licensePlate: item.licensePlate || "",
     operationalStatus: item.operationalStatus ?? true,
     assignedAt: item.assignedAt || "",
+    driverId: item.driverId || "",
+    driverName: item.driverName || "",
   }));
 }
 
@@ -229,12 +254,48 @@ export async function assignGuidesToBooking(
  */
 export async function assignTransportToBooking(
   bookingId: string,
-  transportId: string | null
+  transportId: string | null,
+  driverId: string | null = null
 ): Promise<BookingAssignments> {
   const { data } = await api.put<any>(`/api/booking-assignments/${bookingId}/transport`, {
     transportId,
+    driverId,
   });
   return mapAssignments(data);
+}
+
+export interface MyGuideAssignment {
+  activityScheduleId: string;
+  activityTitle: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  bookingCount: number;
+  totalPeople: number;
+}
+
+export interface MyDriverAssignment {
+  bookingId: string;
+  customerName: string;
+  customerPhone?: string;
+  numberOfPeople: number;
+  status: string;
+  activityTitle: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  transportId: string;
+  model: string;
+  capacity: number;
+  licensePlate: string;
+}
+
+export async function fetchMyGuideAssignments(): Promise<MyGuideAssignment[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/me/guide");
+  return data || [];
+}
+
+export async function fetchMyDriverAssignments(): Promise<MyDriverAssignment[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/me/driver");
+  return data || [];
 }
 
 /**

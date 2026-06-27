@@ -23,7 +23,9 @@ import {
   fetchAvailableGuidesBySchedule,
   assignGuidesToSchedule,
   fetchBookingTransportAssignments,
+  fetchAvailableDrivers,
   type AvailableGuide,
+  type AvailableDriver,
   type ScheduleGuideAssignment,
   type BookingTransportAssignment,
 } from "@/services/bookingAssignmentsService";
@@ -356,20 +358,24 @@ function TransportAssignmentsSubmodule() {
   const toast = useToastContext();
   const [items, setItems] = useState<BookingTransportAssignment[]>([]);
   const [transports, setTransports] = useState<Transport[]>([]);
+  const [drivers, setDrivers] = useState<AvailableDriver[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<BookingTransportAssignment | null>(null);
   const [selectedTransportId, setSelectedTransportId] = useState("");
+  const [selectedDriverId, setSelectedDriverId] = useState("");
   const [saving, setSaving] = useState(false);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     try {
-      const [assigned, available] = await Promise.all([
+      const [assigned, available, availableDrivers] = await Promise.all([
         fetchBookingTransportAssignments(),
         fetchAvailableTransportsWithPagination(1, 100),
+        fetchAvailableDrivers(),
       ]);
       setItems(assigned);
       setTransports(available.items);
+      setDrivers(availableDrivers);
     } catch (e) {
       toast.error("Error al cargar transportes asignados: " + getApiError(e));
     } finally {
@@ -384,13 +390,14 @@ function TransportAssignmentsSubmodule() {
   const openEdit = (item: BookingTransportAssignment) => {
     setEditing(item);
     setSelectedTransportId(item.transportId);
+    setSelectedDriverId(item.driverId || "");
   };
 
   const handleSave = async () => {
     if (!editing) return;
     setSaving(true);
     try {
-      await assignTransportToBooking(editing.bookingId, selectedTransportId || null);
+      await assignTransportToBooking(editing.bookingId, selectedTransportId || null, selectedDriverId || null);
       toast.success("Transporte de la reservación actualizado correctamente");
       setEditing(null);
       await loadItems();
@@ -455,6 +462,9 @@ function TransportAssignmentsSubmodule() {
                     <div className="op-info-strip mt-2">
                       <BusFront size={13} /> {item.model} · {item.licensePlate} · Cap. {item.capacity}
                     </div>
+                    <div className="op-panel-meta mt-1">
+                      Conductor: {item.driverName || "Sin conductor asignado"}
+                    </div>
                   </div>
                   <button className="op-btn-save" onClick={() => openEdit(item)}>
                     <Edit3 size={14} /> Modificar transporte
@@ -501,6 +511,18 @@ function TransportAssignmentsSubmodule() {
                 </option>
               ))}
             </select>
+            <select
+              className="form-select mt-3"
+              value={selectedDriverId}
+              onChange={(e) => setSelectedDriverId(e.target.value)}
+            >
+              <option value="">Seleccionar conductor</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.fullName}
+                </option>
+              ))}
+            </select>
           </div>
         )}
       </Modal>
@@ -526,9 +548,11 @@ export default function OperatorPage() {
 
   // Catálogos
   const [availableTransports, setAvailableTransports] = useState<Transport[]>([]);
+  const [availableDrivers, setAvailableDrivers] = useState<AvailableDriver[]>([]);
 
   // Selecciones en el panel
   const [selectedTransportId, setSelectedTransportId] = useState<string>("");
+  const [selectedDriverId, setSelectedDriverId] = useState<string>("");
 
   // ── Cargar reservas pendientes ──
   const loadBookings = useCallback(async () => {
@@ -546,8 +570,12 @@ export default function OperatorPage() {
   // ── Cargar catálogos generales ──
   const loadCatalogs = useCallback(async () => {
     try {
-      const transports = await fetchAvailableTransportsWithPagination(1, 100);
+      const [transports, drivers] = await Promise.all([
+        fetchAvailableTransportsWithPagination(1, 100),
+        fetchAvailableDrivers(),
+      ]);
       setAvailableTransports(transports.items);
+      setAvailableDrivers(drivers);
     } catch (e) {
       toast.error("Error al cargar catálogos: " + getApiError(e));
     }
@@ -566,6 +594,7 @@ export default function OperatorPage() {
       const current = await getBookingAssignments(booking.id);
       setAssignments(current);
       setSelectedTransportId(current.transport?.id || "");
+      setSelectedDriverId(current.transport?.driverId || "");
     } catch (e) {
       toast.error("Error al cargar asignaciones: " + getApiError(e));
       setAssignments({ guides: [], transport: null });
@@ -580,7 +609,7 @@ export default function OperatorPage() {
     setConfirming(true);
     try {
       if (selectedBooking.transport) {
-        await assignTransportToBooking(selectedBooking.id, selectedTransportId || null);
+        await assignTransportToBooking(selectedBooking.id, selectedTransportId || null, selectedDriverId || null);
       }
 
       await confirmBooking(selectedBooking.id);
@@ -606,7 +635,7 @@ export default function OperatorPage() {
   const canConfirm =
     selectedBooking &&
     (assignments?.guides.length ?? 0) > 0 &&
-    (!selectedBooking.transport || !!selectedTransportId);
+    (!selectedBooking.transport || (!!selectedTransportId && !!selectedDriverId));
 
   return (
     <>
@@ -865,6 +894,12 @@ export default function OperatorPage() {
                       Esta reserva requiere transporte. Debes asignar un vehículo.
                     </div>
                   )}
+                  {selectedBooking.transport && !selectedDriverId && (
+                    <div className="op-warn-strip">
+                      <AlertCircle size={14} />
+                      Esta reserva requiere transporte. Debes asignar un conductor.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -917,6 +952,19 @@ export default function OperatorPage() {
                         ))}
                       </select>
 
+                      <select
+                        className="op-transport-select mb-2"
+                        value={selectedDriverId}
+                        onChange={(e) => setSelectedDriverId(e.target.value)}
+                      >
+                        <option value="">— Seleccionar conductor —</option>
+                        {availableDrivers.map((driver) => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.fullName}
+                          </option>
+                        ))}
+                      </select>
+
                       {selectedTransportId && (
                         <div className="op-info-strip mb-2">
                           <BusFront size={13} />
@@ -926,7 +974,7 @@ export default function OperatorPage() {
 
                       <div className="op-info-strip">
                         <BusFront size={13} />
-                        El transporte seleccionado se guardará al confirmar la reserva.
+                        El vehículo y conductor seleccionados se guardarán al confirmar la reserva.
                       </div>
                     </div>
                   </div>
@@ -944,6 +992,11 @@ export default function OperatorPage() {
                   {selectedBooking.transport && !selectedTransportId && (
                     <span className="d-flex align-items-center gap-1">
                       <AlertCircle size={12} color="#fbbf24" /> Asigna un vehículo de transporte
+                    </span>
+                  )}
+                  {selectedBooking.transport && !selectedDriverId && (
+                    <span className="d-flex align-items-center gap-1">
+                      <AlertCircle size={12} color="#fbbf24" /> Asigna un conductor
                     </span>
                   )}
                 </div>

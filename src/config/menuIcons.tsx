@@ -16,6 +16,7 @@ import {
   Package,
   CalendarCheck,
   ClipboardCheck,
+  MapPin,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -35,6 +36,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Package,
   CalendarCheck,
   ClipboardCheck,
+  MapPin,
 };
 
 export function resolveMenuIcon(name?: string | null, size = 20) {

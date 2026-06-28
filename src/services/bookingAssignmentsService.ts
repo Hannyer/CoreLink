@@ -9,6 +9,13 @@ import type {
 // Tipos internos del servicio
 // ============================================
 
+export interface GuideScheduleConflict {
+  activityScheduleId: string;
+  activityTitle: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+}
+
 export interface AvailableGuide {
   id: string;
   fullName: string;
@@ -17,6 +24,9 @@ export interface AvailableGuide {
   status: boolean;
   speaksEnglish?: boolean;
   languages?: Array<{ id: string; code: string; name: string }>;
+  isAvailable: boolean;
+  isAssignedToSchedule?: boolean;
+  scheduleConflict?: GuideScheduleConflict | null;
 }
 
 export interface AvailableDriver {
@@ -106,9 +116,20 @@ function mapAssignments(data: any): BookingAssignments {
   };
 }
 
-// ============================================
-// Funciones del servicio
-// ============================================
+function mapAvailableGuide(g: any): AvailableGuide {
+  return {
+    id: g.id,
+    fullName: g.fullName || g.full_name || "",
+    email: g.email ?? undefined,
+    phone: g.phone ?? undefined,
+    status: g.status ?? true,
+    speaksEnglish: g.speaksEnglish ?? g.speaks_english ?? false,
+    languages: g.languages || [],
+    isAvailable: g.isAvailable ?? g.is_available ?? true,
+    isAssignedToSchedule: g.isAssignedToSchedule ?? g.is_assigned_to_schedule ?? false,
+    scheduleConflict: g.scheduleConflict ?? g.schedule_conflict ?? null,
+  };
+}
 
 /**
  * Lista los usuarios con rol Guía disponibles para asignar
@@ -117,15 +138,7 @@ export async function fetchAvailableGuides(bookingId?: string): Promise<Availabl
   const { data } = await api.get<any[]>("/api/booking-assignments/guides/available", {
     params: bookingId ? { bookingId } : undefined,
   });
-  return (data || []).map((g: any) => ({
-    id: g.id,
-    fullName: g.fullName || g.full_name || "",
-    email: g.email ?? undefined,
-    phone: g.phone ?? undefined,
-    status: g.status ?? true,
-    speaksEnglish: g.speaksEnglish ?? g.speaks_english ?? false,
-    languages: g.languages || [],
-  }));
+  return (data || []).map(mapAvailableGuide);
 }
 
 export async function fetchAvailableDrivers(): Promise<AvailableDriver[]> {
@@ -167,15 +180,7 @@ export async function fetchAvailableGuidesBySchedule(
   const { data } = await api.get<any[]>(
     `/api/booking-assignments/schedules/${activityScheduleId}/guides/available`
   );
-  return (data || []).map((g: any) => ({
-    id: g.id,
-    fullName: g.fullName || g.full_name || "",
-    email: g.email ?? undefined,
-    phone: g.phone ?? undefined,
-    status: g.status ?? true,
-    speaksEnglish: g.speaksEnglish ?? g.speaks_english ?? false,
-    languages: g.languages || [],
-  }));
+  return (data || []).map(mapAvailableGuide);
 }
 
 export async function assignGuidesToSchedule(

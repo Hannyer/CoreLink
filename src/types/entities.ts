@@ -348,6 +348,26 @@ export interface RoleSelectOption {
   requiresLanguages?: boolean;
 }
 
+// ============================================
+// REFERENCE POINT (Punto de referencia — ops.reference_point)
+// ============================================
+export interface ReferencePoint {
+  id: string;
+  description: string;
+  status: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+  createdByName?: string | null;
+  updatedByName?: string | null;
+}
+
+export interface ReferencePointFormData {
+  description: string;
+  status?: boolean;
+}
+
 export interface UserLanguage {
   id: string;
   code: string;

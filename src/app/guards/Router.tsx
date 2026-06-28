@@ -18,6 +18,7 @@ import RolesPage from "@/page/roles/RolesPage";
 import UsersPage from "@/page/users/UsersPage";
 import SecurityPermissionsPage from "@/page/security/SecurityPermissionsPage";
 import OperatorPage from "@/page/operator/OperatorPage";
+import ReferencePointsPage from "@/page/referencePoints/ReferencePointsPage";
 import MyGuideAssignmentsPage from "@/page/myAssignments/MyGuideAssignmentsPage";
 import MyDriverAssignmentsPage from "@/page/myAssignments/MyDriverAssignmentsPage";
 
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
       { path: "/companies", element: <CompaniesPage /> },
       { path: "/roles", element: <RolesPage /> },
       { path: "/users", element: <UsersPage /> },
+      { path: "/reference-points", element: <ReferencePointsPage /> },
       { path: "/security", element: <SecurityPermissionsPage /> },
       { path: "/bookings", element: <BookingsPage /> },
       { path: "/operator", element: <OperatorPage /> },

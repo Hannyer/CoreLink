@@ -38,6 +38,19 @@ import { Button } from "@/components/ui/Button";
 
 const MAX_GUIDES = 5;
 
+function formatConflictLabel(conflict: AvailableGuide["scheduleConflict"]): string {
+  if (!conflict) return "No disponible";
+  const start = conflict.scheduledStart
+    ? new Date(conflict.scheduledStart).toLocaleString("es-CR", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+  return `Ocupado: ${conflict.activityTitle}${start ? ` (${start})` : ""}`;
+}
+
 function getApiError(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
   return axiosError?.response?.data?.message || axiosError?.message || "Ha ocurrido un error inesperado";
@@ -130,33 +143,53 @@ function GuideAssignmentsSubmodule({ mode }: { mode: "assign" | "edit" }) {
 
   const openEdit = async (item: ScheduleGuideAssignment) => {
     setEditing(item);
-    setSelectedGuideIds(item.guides.map((g) => g.id));
     setGuideSearch("");
     setLoadingGuides(true);
     try {
       const guides = await fetchAvailableGuidesBySchedule(item.activityScheduleId);
       setAvailableGuides(guides);
+      const selectableIds = new Set(
+        guides.filter((g) => g.isAvailable).map((g) => g.id)
+      );
+      setSelectedGuideIds(
+        item.guides.map((g) => g.id).filter((id) => selectableIds.has(id))
+      );
     } catch (e) {
       toast.error("Error al cargar guías disponibles: " + getApiError(e));
       setAvailableGuides([]);
+      setSelectedGuideIds([]);
     } finally {
       setLoadingGuides(false);
     }
   };
 
-  const toggleGuide = (id: string) => {
+  const toggleGuide = (guide: AvailableGuide) => {
+    if (!guide.isAvailable) {
+      toast.error(formatConflictLabel(guide.scheduleConflict));
+      return;
+    }
+
     setSelectedGuideIds((prev) => {
-      if (prev.includes(id)) return prev.filter((guideId) => guideId !== id);
+      if (prev.includes(guide.id)) return prev.filter((guideId) => guideId !== guide.id);
       if (prev.length >= MAX_GUIDES) {
         toast.error(`Máximo ${MAX_GUIDES} guías por salida`);
         return prev;
       }
-      return [...prev, id];
+      return [...prev, guide.id];
     });
   };
 
   const handleSave = async () => {
     if (!editing) return;
+
+    const unavailableSelected = selectedGuideIds.filter(
+      (id) => !availableGuides.find((g) => g.id === id && g.isAvailable)
+    );
+    if (unavailableSelected.length > 0) {
+      toast.error("Hay guías seleccionados que no están disponibles o tienen cruce de horario");
+      return;
+    }
+
     setSaving(true);
     try {
       const updated = await assignGuidesToSchedule(editing.activityScheduleId, selectedGuideIds);
@@ -185,9 +218,17 @@ function GuideAssignmentsSubmodule({ mode }: { mode: "assign" | "edit" }) {
     mode === "assign" ? item.guides.length === 0 : item.guides.length > 0
   );
   const isAssignMode = mode === "assign";
-  const filteredGuides = availableGuides.filter((guide) =>
-    guide.fullName.toLowerCase().includes(guideSearch.trim().toLowerCase())
-  );
+  const filteredGuides = availableGuides
+    .filter((guide) =>
+      guide.fullName.toLowerCase().includes(guideSearch.trim().toLowerCase())
+    )
+    .sort((a, b) => {
+      if (a.isAvailable === b.isAvailable) {
+        return a.fullName.localeCompare(b.fullName, "es");
+      }
+      return a.isAvailable ? -1 : 1;
+    });
+  const availableCount = availableGuides.filter((g) => g.isAvailable).length;
 
   return (
     <div className="op-panel" style={{ minHeight: "calc(100vh - 260px)" }}>
@@ -300,6 +341,9 @@ function GuideAssignmentsSubmodule({ mode }: { mode: "assign" | "edit" }) {
               </div>
             ) : (
               <>
+                <div className="text-muted small mb-2">
+                  {availableCount} guía(s) disponible(s) sin cruce de horario para esta salida.
+                </div>
                 <div className="position-relative mb-3">
                   <Search
                     size={15}
@@ -324,21 +368,47 @@ function GuideAssignmentsSubmodule({ mode }: { mode: "assign" | "edit" }) {
                   ) : (
                     filteredGuides.map((guide) => {
                       const selected = selectedGuideIds.includes(guide.id);
-                      const disabled = !selected && selectedGuideIds.length >= MAX_GUIDES;
+                      const disabled =
+                        !guide.isAvailable ||
+                        (!selected && selectedGuideIds.length >= MAX_GUIDES);
                       return (
                         <button
                           key={guide.id}
                           type="button"
-                          className="btn text-start d-flex justify-content-between align-items-center"
+                          className="btn text-start d-flex justify-content-between align-items-center gap-2"
                           style={{
-                            border: selected ? "1px solid #6366f1" : "1px solid #e2e8f0",
-                            background: selected ? "#eef2ff" : "#fff",
-                            opacity: disabled ? 0.55 : 1,
+                            border: selected
+                              ? "1px solid #6366f1"
+                              : guide.isAvailable
+                                ? "1px solid #e2e8f0"
+                                : "1px solid #fecaca",
+                            background: selected
+                              ? "#eef2ff"
+                              : guide.isAvailable
+                                ? "#fff"
+                                : "#fef2f2",
+                            opacity: disabled ? 0.75 : 1,
+                            cursor: disabled ? "not-allowed" : "pointer",
                           }}
                           disabled={disabled}
-                          onClick={() => toggleGuide(guide.id)}
+                          onClick={() => toggleGuide(guide)}
+                          title={
+                            guide.isAvailable
+                              ? undefined
+                              : formatConflictLabel(guide.scheduleConflict)
+                          }
                         >
-                          <span>{guide.fullName}</span>
+                          <div className="d-flex flex-column align-items-start">
+                            <span>{guide.fullName}</span>
+                            {!guide.isAvailable && (
+                              <span className="small text-danger">
+                                {formatConflictLabel(guide.scheduleConflict)}
+                              </span>
+                            )}
+                            {guide.isAvailable && guide.isAssignedToSchedule && (
+                              <span className="small text-success">Asignado a esta salida</span>
+                            )}
+                          </div>
                           {selected && <CheckCircle2 size={18} color="#4f46e5" />}
                         </button>
                       );

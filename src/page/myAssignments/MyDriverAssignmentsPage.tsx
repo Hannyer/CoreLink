@@ -15,17 +15,42 @@ function formatDateTime(value: string) {
     : "-";
 }
 
+function toDatetimeLocal(value: Date) {
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+function getTodayDateRange() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return {
+    startDateTime: toDatetimeLocal(start),
+    endDateTime: toDatetimeLocal(end),
+  };
+}
+
+function toIsoOrUndefined(value: string) {
+  return value ? new Date(value).toISOString() : undefined;
+}
+
 export default function MyDriverAssignmentsPage() {
   const toast = useToastContext();
   const [items, setItems] = useState<MyDriverAssignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState(getTodayDateRange);
 
   useEffect(() => {
-    fetchMyDriverAssignments()
+    setLoading(true);
+    fetchMyDriverAssignments({
+      startDateTime: toIsoOrUndefined(filters.startDateTime),
+      endDateTime: toIsoOrUndefined(filters.endDateTime),
+    })
       .then(setItems)
       .catch((error) => toast.error(error?.response?.data?.message || "Error al cargar transportes asignados"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [filters]);
 
   return (
     <div>
@@ -37,10 +62,31 @@ export default function MyDriverAssignmentsPage() {
         </div>
       </div>
 
+      <div className="row g-3 mb-3">
+        <div className="col-12 col-md-6 col-lg-4">
+          <label className="form-label text-white-50 small">Inicio</label>
+          <input
+            type="datetime-local"
+            className="form-control"
+            value={filters.startDateTime}
+            onChange={(event) => setFilters((current) => ({ ...current, startDateTime: event.target.value }))}
+          />
+        </div>
+        <div className="col-12 col-md-6 col-lg-4">
+          <label className="form-label text-white-50 small">Fin</label>
+          <input
+            type="datetime-local"
+            className="form-control"
+            value={filters.endDateTime}
+            onChange={(event) => setFilters((current) => ({ ...current, endDateTime: event.target.value }))}
+          />
+        </div>
+      </div>
+
       {loading ? (
         <div className="text-center py-5"><Loader2 className="spin" /> Cargando...</div>
       ) : items.length === 0 ? (
-        <div className="text-center text-white-50 py-5">No tienes traslados asignados próximos.</div>
+        <div className="text-center text-white-50 py-5">No tienes traslados asignados en el rango seleccionado.</div>
       ) : (
         <div className="d-flex flex-column gap-3">
           {items.map((item) => (

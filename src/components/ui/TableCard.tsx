@@ -32,7 +32,7 @@ type TableCardProps<T> = {
   hover?: boolean;
 };
 
-const wrapper: CSSProperties = { padding: "8px 12px", minHeight: 0 };
+const wrapper: CSSProperties = { padding: "8px 12px", minHeight: 0, minWidth: 0 };
 
 const card: CSSProperties = {
   background: "#ffffff",
@@ -136,7 +136,18 @@ export function TableCard<T>({
 
   return (
     <div style={wrapper}>
-      <div style={card}>
+      <div
+        style={{
+          ...card,
+          ...(isMobile
+            ? {
+                padding: "14px",
+                maxHeight: "none",
+                overflow: "visible",
+              }
+            : null),
+        }}
+      >
         {(title || headerExtra) && (
           <div style={{ 
             display: "flex", 
@@ -146,8 +157,8 @@ export function TableCard<T>({
             flexWrap: "wrap",
             gap: "8px"
           }}>
-            {title ? <h2 style={titleStyle}>{title}</h2> : <div />}
-            {headerExtra}
+            {title ? <h2 style={{ ...titleStyle, fontSize: isMobile ? "1.1rem" : undefined }}>{title}</h2> : <div />}
+            <div style={{ width: isMobile ? "100%" : undefined }}>{headerExtra}</div>
           </div>
         )}
 
@@ -157,7 +168,7 @@ export function TableCard<T>({
           <div style={{ color: "#64748b", padding: "12px 4px", textAlign: "center" }}>{emptyText}</div>
         ) : isMobile ? (
           // Vista de cards para móvil
-          <div style={scrollArea}>
+          <div style={{ ...scrollArea, overflow: isMobile ? "visible" : "auto" }}>
             {data.map((row) => (
               <div key={String(rowKey(row))} style={cardMobile}>
                 {visibleColumns.map((c) => {

@@ -15,7 +15,6 @@ export interface AuthUser {
   phone?: string;
   roleId: string;
   roleName?: string;
-  licenseExpirationDate?: string | null;
   speaksEnglish?: boolean;
   status?: boolean;
   isexternal?: boolean;
@@ -35,8 +34,6 @@ function normalizeUser(raw: Record<string, unknown>): AuthUser {
     phone: (raw.phone as string) ?? undefined,
     roleId: String(raw.roleId ?? raw.role_id ?? raw.ID_Role ?? ""),
     roleName: (raw.roleName ?? raw.role_name) as string | undefined,
-    licenseExpirationDate: (raw.licenseExpirationDate ??
-      raw.license_expiration_date) as string | null | undefined,
     speaksEnglish: Boolean(raw.speaksEnglish ?? raw.speaks_english),
     status: raw.status as boolean | undefined,
     isexternal: raw.isexternal as boolean | undefined,

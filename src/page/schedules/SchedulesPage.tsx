@@ -574,7 +574,7 @@ export default function SchedulesPage() {
 
   const headerExtra = (
     <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-      <div style={{ minWidth: "250px", flex: 1 }}>
+      <div style={{ minWidth: "min(250px, 100%)", flex: "1 1 250px" }}>
         <FormCombobox
           label="Filtrar por Actividad"
           value={selectedActivityId}
@@ -614,7 +614,7 @@ export default function SchedulesPage() {
                   setFilterStartDate(e.target.value);
                   setPage(1);
                 }}
-                style={{ width: "150px" }}
+                style={{ width: "min(150px, 100%)" }}
               />
               <FormInput
                 label="Fecha Fin"
@@ -624,7 +624,7 @@ export default function SchedulesPage() {
                   setFilterEndDate(e.target.value);
                   setPage(1);
                 }}
-                style={{ width: "150px" }}
+                style={{ width: "min(150px, 100%)" }}
               />
             </>
           )}
@@ -817,7 +817,7 @@ export default function SchedulesPage() {
                 key={index}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr auto",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
                   gap: "12px",
                   alignItems: "flex-end",
                   marginBottom: "12px",

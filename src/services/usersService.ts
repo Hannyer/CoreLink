@@ -2,6 +2,7 @@ import api from "@/api/apiClient";
 import type {
   User,
   UserFormData,
+  LicenseType,
   PaginatedResponse,
 } from "@/types/entities";
 import type { SelectOption } from "@/components/form/FormSelect";
@@ -23,9 +24,15 @@ function mapApiUser(raw: any): User {
     roleRequiresLanguages:
       raw.roleRequiresLanguages ?? raw.role_requires_languages ?? false,
     languages: Array.isArray(raw.languages) ? raw.languages : [],
-    licenseExpirationDate: toDateInputValueOrNull(
-      raw.licenseExpirationDate ?? raw.license_expiration_date
-    ),
+    licenses: Array.isArray(raw.licenses)
+      ? raw.licenses.map((item: any) => ({
+          licenseTypeId: item.licenseTypeId ?? item.license_type_id ?? "",
+          licenseTypeName: item.licenseTypeName ?? item.license_type_name ?? item.name ?? "",
+          expirationDate: toDateInputValueOrNull(
+            item.expirationDate ?? item.expiration_date
+          ) ?? "",
+        }))
+      : [],
     speaksEnglish: raw.speaksEnglish ?? raw.speaks_english ?? false,
     status: raw.status ?? true,
     createdAt: raw.createdAt ?? raw.created_at ?? "",
@@ -55,6 +62,16 @@ export async function fetchUserRoles(): Promise<UserRoleOption[]> {
     description: r.description ?? null,
     requiresLicense: r.requiresLicense ?? false,
     requiresLanguages: r.requiresLanguages ?? false,
+  }));
+}
+
+export async function fetchLicenseTypes(): Promise<LicenseType[]> {
+  const { data } = await api.get<any[]>("/api/users/license-types");
+  if (!Array.isArray(data)) return [];
+  return data.map((item) => ({
+    id: item.id,
+    name: item.name,
+    status: item.status ?? true,
   }));
 }
 
@@ -105,11 +122,11 @@ export async function createUser(payload: UserFormData): Promise<User> {
     status: payload.status ?? true,
   };
 
-  if (payload.licenseExpirationDate) {
-    body.licenseExpirationDate = payload.licenseExpirationDate;
-  }
   if (payload.languageIds && payload.languageIds.length > 0) {
     body.languageIds = payload.languageIds;
+  }
+  if (payload.licenses !== undefined) {
+    body.licenses = payload.licenses;
   }
 
   const { data } = await api.post<any>("/api/users", body);
@@ -130,14 +147,14 @@ export async function updateUser(
     body.password = payload.password;
   }
   if (payload.roleId !== undefined) body.roleId = payload.roleId;
-  if (payload.licenseExpirationDate !== undefined) {
-    body.licenseExpirationDate = payload.licenseExpirationDate || null;
-  }
   if (payload.speaksEnglish !== undefined)
     body.speaksEnglish = payload.speaksEnglish;
   if (payload.status !== undefined) body.status = payload.status;
   if (payload.languageIds !== undefined) {
     body.languageIds = payload.languageIds;
+  }
+  if (payload.licenses !== undefined) {
+    body.licenses = payload.licenses;
   }
 
   const { data } = await api.put<any>(`/api/users/${id}`, body);

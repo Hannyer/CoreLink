@@ -49,6 +49,9 @@ export interface ConfirmBookingResult {
     licensePlate: string;
     operationalStatus: boolean;
     assignedAt: string;
+    referencePointId?: string;
+    referencePointDescription?: string;
+    pickupAt?: string;
   } | null;
 }
 
@@ -80,6 +83,9 @@ export interface BookingTransportAssignment {
   assignedAt: string;
   driverId?: string;
   driverName?: string;
+  referencePointId?: string;
+  referencePointDescription?: string;
+  pickupAt?: string;
 }
 
 // ============================================
@@ -111,6 +117,10 @@ function mapAssignments(data: any): BookingAssignments {
           assignedAt: data.transport.assignedAt || "",
           driverId: data.transport.driverId ?? undefined,
           driverName: data.transport.driverName ?? undefined,
+          referencePointId: data.transport.referencePointId ?? data.transport.reference_point_id ?? undefined,
+          referencePointDescription:
+            data.transport.referencePointDescription ?? data.transport.reference_point_description ?? undefined,
+          pickupAt: data.transport.pickupAt ?? data.transport.pickup_at ?? undefined,
         }
       : null,
   };
@@ -230,6 +240,9 @@ export async function fetchBookingTransportAssignments(): Promise<BookingTranspo
     assignedAt: item.assignedAt || "",
     driverId: item.driverId || "",
     driverName: item.driverName || "",
+    referencePointId: item.referencePointId || item.reference_point_id || "",
+    referencePointDescription: item.referencePointDescription || item.reference_point_description || "",
+    pickupAt: item.pickupAt || item.pickup_at || "",
   }));
 }
 
@@ -260,11 +273,16 @@ export async function assignGuidesToBooking(
 export async function assignTransportToBooking(
   bookingId: string,
   transportId: string | null,
-  driverId: string | null = null
+  driverId: string | null = null,
+  referencePointId: string | null = null,
+  pickupAt: string | null = null
 ): Promise<BookingAssignments> {
+  const normalizedPickupAt = pickupAt ? new Date(pickupAt).toISOString() : null;
   const { data } = await api.put<any>(`/api/booking-assignments/${bookingId}/transport`, {
     transportId,
     driverId,
+    referencePointId,
+    pickupAt: normalizedPickupAt,
   });
   return mapAssignments(data);
 }
@@ -291,15 +309,23 @@ export interface MyDriverAssignment {
   model: string;
   capacity: number;
   licensePlate: string;
+  referencePointId?: string;
+  referencePointDescription?: string;
+  pickupAt?: string;
 }
 
-export async function fetchMyGuideAssignments(): Promise<MyGuideAssignment[]> {
-  const { data } = await api.get<any[]>("/api/booking-assignments/me/guide");
+export interface MyAssignmentDateRange {
+  startDateTime?: string;
+  endDateTime?: string;
+}
+
+export async function fetchMyGuideAssignments(filters: MyAssignmentDateRange = {}): Promise<MyGuideAssignment[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/me/guide", { params: filters });
   return data || [];
 }
 
-export async function fetchMyDriverAssignments(): Promise<MyDriverAssignment[]> {
-  const { data } = await api.get<any[]>("/api/booking-assignments/me/driver");
+export async function fetchMyDriverAssignments(filters: MyAssignmentDateRange = {}): Promise<MyDriverAssignment[]> {
+  const { data } = await api.get<any[]>("/api/booking-assignments/me/driver", { params: filters });
   return data || [];
 }
 
@@ -329,6 +355,10 @@ export async function confirmBooking(bookingId: string): Promise<ConfirmBookingR
           licensePlate: data.transport.licensePlate || data.transport.license_plate || "",
           operationalStatus: data.transport.operationalStatus ?? true,
           assignedAt: data.transport.assignedAt || "",
+          referencePointId: data.transport.referencePointId ?? data.transport.reference_point_id ?? undefined,
+          referencePointDescription:
+            data.transport.referencePointDescription ?? data.transport.reference_point_description ?? undefined,
+          pickupAt: data.transport.pickupAt ?? data.transport.pickup_at ?? undefined,
         }
       : null,
   };

@@ -374,6 +374,18 @@ export interface UserLanguage {
   name: string;
 }
 
+export interface LicenseType {
+  id: string;
+  name: string;
+  status: boolean;
+}
+
+export interface UserLicense {
+  licenseTypeId: string;
+  licenseTypeName?: string;
+  expirationDate: string;
+}
+
 // ============================================
 // USER (Usuario del sistema — ops.app_user)
 // ============================================
@@ -387,8 +399,8 @@ export interface User {
   roleName?: string;
   roleRequiresLicense?: boolean;
   roleRequiresLanguages?: boolean;
-  licenseExpirationDate: string | null;
   languages?: UserLanguage[];
+  licenses?: UserLicense[];
   speaksEnglish: boolean;
   status: boolean;
   createdAt: string;
@@ -402,8 +414,8 @@ export interface UserFormData {
   phone: string;
   password: string;
   roleId: string;
-  licenseExpirationDate?: string | null;
   languageIds?: string[];
+  licenses?: UserLicense[];
   speaksEnglish?: boolean;
   status?: boolean;
 }
@@ -655,6 +667,8 @@ export interface Booking {
   companyId?: string | null;
   paymentTypeId?: string | null;
   cardTypeId?: string | null;
+  referencePointId?: string | null;
+  referencePointDescription?: string | null;
   transport: boolean;
   numberOfPeople: number;
   adultCount: number;
@@ -696,6 +710,7 @@ export interface BookingFormData {
   transport?: boolean;
   paymentTypeId?: string | null;
   cardTypeId?: string | null;
+  referencePointId?: string | null;
   numberOfPeople: number;
   adultCount: number;
   childCount: number;
@@ -763,6 +778,9 @@ export interface BookingTransportAssignment {
   assignedAt: string;
   driverId?: string;
   driverName?: string;
+  referencePointId?: string;
+  referencePointDescription?: string;
+  pickupAt?: string;
 }
 
 export interface BookingAssignments {

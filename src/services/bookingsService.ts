@@ -37,6 +37,9 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
     companyId: apiBooking.companyId ?? apiBooking.company_id ?? null,
     paymentTypeId: apiBooking.paymentTypeId ?? apiBooking.payment_type_id ?? null,
     cardTypeId: apiBooking.cardTypeId ?? apiBooking.card_type_id ?? null,
+    referencePointId: apiBooking.referencePointId ?? apiBooking.reference_point_id ?? null,
+    referencePointDescription:
+      apiBooking.referencePointDescription ?? apiBooking.reference_point_description ?? null,
     transport: apiBooking.transport ?? false,
     numberOfPeople: apiBooking.numberOfPeople ?? apiBooking.number_of_people ?? 0,
     adultCount: apiBooking.adultCount ?? apiBooking.adult_count ?? 0,
@@ -191,6 +194,7 @@ export async function createBooking(payload: BookingFormData): Promise<Booking> 
   if (payload.companyId != null) apiPayload.companyId = payload.companyId;
   if (payload.cardTypeId != null) apiPayload.cardTypeId = payload.cardTypeId;
   if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
+  if (payload.transport && payload.referencePointId != null) apiPayload.referencePointId = payload.referencePointId;
   if (payload.commissionPercentage != null) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.subtotal !== undefined) apiPayload.subtotal = payload.subtotal;
   if (payload.vatAmount !== undefined) apiPayload.vatAmount = payload.vatAmount;
@@ -217,7 +221,11 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
   if (payload.cardTypeId !== undefined) apiPayload.cardTypeId = payload.cardTypeId;
   if (payload.transport !== undefined) apiPayload.transport = payload.transport;
   if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
-  else if (payload.transport === false) apiPayload.passengerCount = null;
+  if (payload.transport && payload.referencePointId != null) apiPayload.referencePointId = payload.referencePointId;
+  else if (payload.transport === false) {
+    apiPayload.passengerCount = null;
+    apiPayload.referencePointId = null;
+  }
   if (payload.numberOfPeople !== undefined) apiPayload.numberOfPeople = payload.numberOfPeople;
   if (payload.adultCount !== undefined) apiPayload.adultCount = payload.adultCount;
   if (payload.childCount !== undefined) apiPayload.childCount = payload.childCount;

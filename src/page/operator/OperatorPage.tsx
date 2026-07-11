@@ -30,8 +30,9 @@ import {
   type BookingTransportAssignment,
 } from "@/services/bookingAssignmentsService";
 import { fetchAvailableTransportsWithPagination } from "@/services/transportService";
+import { fetchBookingReferencePoints } from "@/services/referencePointsService";
 import { useToastContext } from "@/contexts/ToastContext";
-import type { Booking, BookingAssignments, Transport } from "@/types/entities";
+import type { Booking, BookingAssignments, ReferencePoint, Transport } from "@/types/entities";
 import type { AxiosError } from "axios";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -54,6 +55,22 @@ function formatConflictLabel(conflict: AvailableGuide["scheduleConflict"]): stri
 function getApiError(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
   return axiosError?.response?.data?.message || axiosError?.message || "Ha ocurrido un error inesperado";
+}
+
+function toDateTimeLocalValue(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function defaultPickupDateTime(scheduledStart?: string | null): string {
+  if (!scheduledStart) return "";
+  const date = new Date(scheduledStart);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setHours(date.getHours() - 1);
+  return toDateTimeLocalValue(date.toISOString());
 }
 
 // ─── Badge de estado ─────────────────────────────────────────────────────────
@@ -429,23 +446,28 @@ function TransportAssignmentsSubmodule() {
   const [items, setItems] = useState<BookingTransportAssignment[]>([]);
   const [transports, setTransports] = useState<Transport[]>([]);
   const [drivers, setDrivers] = useState<AvailableDriver[]>([]);
+  const [referencePoints, setReferencePoints] = useState<ReferencePoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<BookingTransportAssignment | null>(null);
   const [selectedTransportId, setSelectedTransportId] = useState("");
   const [selectedDriverId, setSelectedDriverId] = useState("");
+  const [selectedReferencePointId, setSelectedReferencePointId] = useState("");
+  const [pickupAt, setPickupAt] = useState("");
   const [saving, setSaving] = useState(false);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     try {
-      const [assigned, available, availableDrivers] = await Promise.all([
+      const [assigned, available, availableDrivers, points] = await Promise.all([
         fetchBookingTransportAssignments(),
         fetchAvailableTransportsWithPagination(1, 100),
         fetchAvailableDrivers(),
+        fetchBookingReferencePoints(),
       ]);
       setItems(assigned);
       setTransports(available.items);
       setDrivers(availableDrivers);
+      setReferencePoints(points);
     } catch (e) {
       toast.error("Error al cargar transportes asignados: " + getApiError(e));
     } finally {
@@ -461,13 +483,21 @@ function TransportAssignmentsSubmodule() {
     setEditing(item);
     setSelectedTransportId(item.transportId);
     setSelectedDriverId(item.driverId || "");
+    setSelectedReferencePointId(item.referencePointId || "");
+    setPickupAt(toDateTimeLocalValue(item.pickupAt) || defaultPickupDateTime(item.scheduledStart));
   };
 
   const handleSave = async () => {
     if (!editing) return;
     setSaving(true);
     try {
-      await assignTransportToBooking(editing.bookingId, selectedTransportId || null, selectedDriverId || null);
+      await assignTransportToBooking(
+        editing.bookingId,
+        selectedTransportId || null,
+        selectedDriverId || null,
+        selectedReferencePointId || null,
+        pickupAt || null
+      );
       toast.success("Transporte de la reservación actualizado correctamente");
       setEditing(null);
       await loadItems();
@@ -535,6 +565,12 @@ function TransportAssignmentsSubmodule() {
                     <div className="op-panel-meta mt-1">
                       Conductor: {item.driverName || "Sin conductor asignado"}
                     </div>
+                    <div className="op-panel-meta mt-1">
+                      Punto de referencia: {item.referencePointDescription || "Sin punto asignado"}
+                    </div>
+                    <div className="op-panel-meta mt-1">
+                      Recogida: {formatDateTime(item.pickupAt || "")}
+                    </div>
                   </div>
                   <button className="op-btn-save" onClick={() => openEdit(item)}>
                     <Edit3 size={14} /> Modificar transporte
@@ -555,7 +591,11 @@ function TransportAssignmentsSubmodule() {
             <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} loading={saving} disabled={!selectedTransportId}>
+            <Button
+              onClick={handleSave}
+              loading={saving}
+              disabled={!selectedTransportId || !selectedDriverId || !selectedReferencePointId || !pickupAt}
+            >
               Guardar cambios
             </Button>
           </>
@@ -593,6 +633,25 @@ function TransportAssignmentsSubmodule() {
                 </option>
               ))}
             </select>
+            <select
+              className="form-select mt-3"
+              value={selectedReferencePointId}
+              onChange={(e) => setSelectedReferencePointId(e.target.value)}
+            >
+              <option value="">Seleccionar punto de referencia</option>
+              {referencePoints.map((point) => (
+                <option key={point.id} value={point.id}>
+                  {point.description}
+                </option>
+              ))}
+            </select>
+            <label className="form-label mt-3 mb-1">Fecha y hora de recogida</label>
+            <input
+              className="form-control"
+              type="datetime-local"
+              value={pickupAt}
+              onChange={(e) => setPickupAt(e.target.value)}
+            />
           </div>
         )}
       </Modal>
@@ -619,10 +678,13 @@ export default function OperatorPage() {
   // Catálogos
   const [availableTransports, setAvailableTransports] = useState<Transport[]>([]);
   const [availableDrivers, setAvailableDrivers] = useState<AvailableDriver[]>([]);
+  const [referencePoints, setReferencePoints] = useState<ReferencePoint[]>([]);
 
   // Selecciones en el panel
   const [selectedTransportId, setSelectedTransportId] = useState<string>("");
   const [selectedDriverId, setSelectedDriverId] = useState<string>("");
+  const [selectedReferencePointId, setSelectedReferencePointId] = useState<string>("");
+  const [pickupAt, setPickupAt] = useState<string>("");
 
   // ── Cargar reservas pendientes ──
   const loadBookings = useCallback(async () => {
@@ -640,12 +702,14 @@ export default function OperatorPage() {
   // ── Cargar catálogos generales ──
   const loadCatalogs = useCallback(async () => {
     try {
-      const [transports, drivers] = await Promise.all([
+      const [transports, drivers, points] = await Promise.all([
         fetchAvailableTransportsWithPagination(1, 100),
         fetchAvailableDrivers(),
+        fetchBookingReferencePoints(),
       ]);
       setAvailableTransports(transports.items);
       setAvailableDrivers(drivers);
+      setReferencePoints(points);
     } catch (e) {
       toast.error("Error al cargar catálogos: " + getApiError(e));
     }
@@ -665,9 +729,19 @@ export default function OperatorPage() {
       setAssignments(current);
       setSelectedTransportId(current.transport?.id || "");
       setSelectedDriverId(current.transport?.driverId || "");
+      setSelectedReferencePointId(
+        current.transport?.referencePointId || booking.referencePointId || ""
+      );
+      setPickupAt(
+        toDateTimeLocalValue(current.transport?.pickupAt) || defaultPickupDateTime(booking.scheduledStart)
+      );
     } catch (e) {
       toast.error("Error al cargar asignaciones: " + getApiError(e));
       setAssignments({ guides: [], transport: null });
+      setSelectedTransportId("");
+      setSelectedDriverId("");
+      setSelectedReferencePointId(booking.referencePointId || "");
+      setPickupAt(defaultPickupDateTime(booking.scheduledStart));
     } finally {
       setLoadingPanel(false);
     }
@@ -679,7 +753,13 @@ export default function OperatorPage() {
     setConfirming(true);
     try {
       if (selectedBooking.transport) {
-        await assignTransportToBooking(selectedBooking.id, selectedTransportId || null, selectedDriverId || null);
+        await assignTransportToBooking(
+          selectedBooking.id,
+          selectedTransportId || null,
+          selectedDriverId || null,
+          selectedReferencePointId || null,
+          pickupAt || null
+        );
       }
 
       await confirmBooking(selectedBooking.id);
@@ -705,7 +785,8 @@ export default function OperatorPage() {
   const canConfirm =
     selectedBooking &&
     (assignments?.guides.length ?? 0) > 0 &&
-    (!selectedBooking.transport || (!!selectedTransportId && !!selectedDriverId));
+    (!selectedBooking.transport ||
+      (!!selectedTransportId && !!selectedDriverId && !!selectedReferencePointId && !!pickupAt));
 
   return (
     <>
@@ -970,6 +1051,18 @@ export default function OperatorPage() {
                       Esta reserva requiere transporte. Debes asignar un conductor.
                     </div>
                   )}
+                  {selectedBooking.transport && !selectedReferencePointId && (
+                    <div className="op-warn-strip">
+                      <AlertCircle size={14} />
+                      Esta reserva requiere punto de referencia para la recogida.
+                    </div>
+                  )}
+                  {selectedBooking.transport && !pickupAt && (
+                    <div className="op-warn-strip">
+                      <AlertCircle size={14} />
+                      Indica la fecha y hora de recogida de los clientes.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1035,6 +1128,27 @@ export default function OperatorPage() {
                         ))}
                       </select>
 
+                      <select
+                        className="op-transport-select mb-2"
+                        value={selectedReferencePointId}
+                        onChange={(e) => setSelectedReferencePointId(e.target.value)}
+                      >
+                        <option value="">— Seleccionar punto de referencia —</option>
+                        {referencePoints.map((point) => (
+                          <option key={point.id} value={point.id}>
+                            {point.description}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="op-panel-meta mb-1 d-block">Fecha y hora de recogida</label>
+                      <input
+                        className="op-transport-select mb-2"
+                        type="datetime-local"
+                        value={pickupAt}
+                        onChange={(e) => setPickupAt(e.target.value)}
+                      />
+
                       {selectedTransportId && (
                         <div className="op-info-strip mb-2">
                           <BusFront size={13} />
@@ -1044,7 +1158,7 @@ export default function OperatorPage() {
 
                       <div className="op-info-strip">
                         <BusFront size={13} />
-                        El vehículo y conductor seleccionados se guardarán al confirmar la reserva.
+                        El vehículo, conductor, punto de referencia y hora de recogida se guardarán al confirmar la reserva.
                       </div>
                     </div>
                   </div>
@@ -1067,6 +1181,16 @@ export default function OperatorPage() {
                   {selectedBooking.transport && !selectedDriverId && (
                     <span className="d-flex align-items-center gap-1">
                       <AlertCircle size={12} color="#fbbf24" /> Asigna un conductor
+                    </span>
+                  )}
+                  {selectedBooking.transport && !selectedReferencePointId && (
+                    <span className="d-flex align-items-center gap-1">
+                      <AlertCircle size={12} color="#fbbf24" /> Selecciona el punto de referencia
+                    </span>
+                  )}
+                  {selectedBooking.transport && !pickupAt && (
+                    <span className="d-flex align-items-center gap-1">
+                      <AlertCircle size={12} color="#fbbf24" /> Indica la hora de recogida
                     </span>
                   )}
                 </div>

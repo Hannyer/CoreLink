@@ -6,6 +6,7 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  fetchLicenseTypes,
   type UserRoleOption,
 } from "@/services/usersService";
 import { Pagination } from "@/components/ui/Pagination";
@@ -14,13 +15,12 @@ import { Button } from "@/components/ui/Button";
 import { FormInput } from "@/components/form/FormInput";
 import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { FormCombobox } from "@/components/form/FormCombobox";
-import { DatePicker } from "@/components/form/DatePicker";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useToastContext } from "@/contexts/ToastContext";
 import { Edit, Trash2, Plus, Eye, EyeOff } from "lucide-react";
-import type { User, UserFormData } from "@/types/entities";
+import type { LicenseType, User, UserFormData } from "@/types/entities";
 import type { AxiosError } from "axios";
-import { toDateInputValueOrNull, todayDateInputValue } from "@/utils/dateUtils";
+import { todayDateInputValue } from "@/utils/dateUtils";
 import { getLanguages, type Language } from "@/services/languageService";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -47,8 +47,8 @@ const EMPTY_FORM: UserFormData = {
   phone: "",
   password: "",
   roleId: "",
-  licenseExpirationDate: null,
   languageIds: [],
+  licenses: [],
   speaksEnglish: false,
   status: true,
 };
@@ -74,6 +74,8 @@ export default function UsersPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [languages, setLanguages] = useState<Language[]>([]);
   const [loadingLanguages, setLoadingLanguages] = useState(false);
+  const [licenseTypes, setLicenseTypes] = useState<LicenseType[]>([]);
+  const [loadingLicenseTypes, setLoadingLicenseTypes] = useState(false);
 
   // ── pagination / filter state ──
   const [page, setPage] = useState(1);
@@ -137,6 +139,7 @@ export default function UsersPage() {
     selectedRole?.requiresLanguages ??
     editingUser?.roleRequiresLanguages ??
     formData.roleId === ROLE_ID_GUIA;
+  const requiresLicenses = requiresLicense || requiresLanguages;
 
   const loadLanguages = async () => {
     try {
@@ -159,6 +162,35 @@ export default function UsersPage() {
     setFormData({ ...formData, languageIds: next });
   };
 
+  const loadLicenseTypes = async () => {
+    try {
+      setLoadingLicenseTypes(true);
+      const list = await fetchLicenseTypes();
+      setLicenseTypes(list.filter((item) => item.status !== false));
+    } catch (error) {
+      console.error("Error al cargar tipos de licencia:", error);
+      toast.error("Error al cargar tipos de licencia");
+    } finally {
+      setLoadingLicenseTypes(false);
+    }
+  };
+
+  const handleLicenseToggle = (licenseTypeId: string) => {
+    const current = formData.licenses ?? [];
+    const exists = current.some((item) => item.licenseTypeId === licenseTypeId);
+    const next = exists
+      ? current.filter((item) => item.licenseTypeId !== licenseTypeId)
+      : [...current, { licenseTypeId, expirationDate: "" }];
+    setFormData({ ...formData, licenses: next });
+  };
+
+  const handleLicenseExpirationChange = (licenseTypeId: string, expirationDate: string) => {
+    const next = (formData.licenses ?? []).map((item) =>
+      item.licenseTypeId === licenseTypeId ? { ...item, expirationDate } : item
+    );
+    setFormData({ ...formData, licenses: next });
+  };
+
   // ── handlers ──
 
   const handleCreate = () => {
@@ -167,6 +199,7 @@ export default function UsersPage() {
     setShowPassword(false);
     setShowModal(true);
     void loadLanguages();
+    void loadLicenseTypes();
   };
 
   const handleEdit = (user: User) => {
@@ -178,14 +211,15 @@ export default function UsersPage() {
       phone: user.phone,
       password: "", // nunca cargamos la contraseña
       roleId: user.roleId,
-      licenseExpirationDate: toDateInputValueOrNull(user.licenseExpirationDate),
       languageIds: user.languages?.map((l) => l.id) ?? [],
+      licenses: user.licenses ?? [],
       speaksEnglish: user.speaksEnglish,
       status: user.status,
     });
     setShowPassword(false);
     setShowModal(true);
     void loadLanguages();
+    void loadLicenseTypes();
   };
 
   const handleDeactivate = async (id: string) => {
@@ -243,10 +277,12 @@ export default function UsersPage() {
       toast.error("El rol es requerido");
       return;
     }
-    if (requiresLicense && !formData.licenseExpirationDate) {
-      toast.error(
-        "La fecha de vencimiento de licencia es obligatoria para el rol Conductor"
-      );
+    if (requiresLicenses && (!formData.licenses || formData.licenses.length === 0)) {
+      toast.error("Debe seleccionar al menos una licencia para el rol Guía o Conductor");
+      return;
+    }
+    if (requiresLicenses && formData.licenses?.some((item) => !item.expirationDate)) {
+      toast.error("Todas las licencias seleccionadas deben tener fecha de vencimiento");
       return;
     }
     if (requiresLanguages && (!formData.languageIds || formData.languageIds.length === 0)) {
@@ -265,13 +301,17 @@ export default function UsersPage() {
           fullName: formData.fullName,
           phone: formData.phone,
           roleId: formData.roleId,
-          licenseExpirationDate: formData.licenseExpirationDate,
           speaksEnglish: formData.speaksEnglish,
           status: formData.status,
         };
 
         if (requiresLanguages) {
           payload.languageIds = formData.languageIds ?? [];
+        }
+        if (requiresLicenses) {
+          payload.licenses = formData.licenses ?? [];
+        } else {
+          payload.licenses = [];
         }
 
         // Solo enviar password si el usuario escribió una nueva
@@ -514,7 +554,7 @@ export default function UsersPage() {
       >
         <form onSubmit={handleSubmit}>
           {/* Fila 1: Cédula + Nombre */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0 16px" }}>
             <FormInput
               label="Cédula"
               value={formData.cedula}
@@ -540,7 +580,7 @@ export default function UsersPage() {
           </div>
 
           {/* Fila 2: Email + Teléfono */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0 16px" }}>
             <FormInput
               label="Correo electrónico"
               value={formData.email}
@@ -623,12 +663,15 @@ export default function UsersPage() {
               setFormData({
                 ...formData,
                 roleId: nextRoleId,
-                ...(!nextRequiresLicense ? { licenseExpirationDate: null } : {}),
+                ...(!(nextRequiresLicense || nextRequiresLanguages) ? { licenses: [] } : {}),
                 ...(!nextRequiresLanguages ? { languageIds: [] } : {}),
               });
 
               if (nextRequiresLanguages && languages.length === 0) {
                 void loadLanguages();
+              }
+              if ((nextRequiresLicense || nextRequiresLanguages) && licenseTypes.length === 0) {
+                void loadLicenseTypes();
               }
             }}
             required
@@ -638,26 +681,100 @@ export default function UsersPage() {
             searchPlaceholder="Buscar rol..."
           />
 
-          {/* Fila 5: Fecha licencia (condicional) */}
-          {requiresLicense && (
-            <DatePicker
-              label="Fecha de vencimiento de licencia *"
-              value={formData.licenseExpirationDate ?? ""}
-              onChange={(val) =>
-                setFormData({
-                  ...formData,
-                  licenseExpirationDate: val ? val : null,
-                })
-              }
-              minDate={
-                editingUser ? "1970-01-01" : todayDateInputValue()
-              }
-              required
-              fullWidth
-              disabled={formLoading}
-              placeholder="Seleccionar fecha"
-              helperText="Obligatorio para el rol Conductor"
-            />
+          {requiresLicenses && (
+            <div style={{ marginTop: "8px", marginBottom: "8px" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "#1e293b",
+                }}
+              >
+                Licencias <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              {loadingLicenseTypes ? (
+                <div style={{ color: "#64748b", fontSize: "0.875rem" }}>
+                  Cargando tipos de licencia...
+                </div>
+              ) : licenseTypes.length === 0 ? (
+                <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>
+                  No hay tipos de licencia disponibles
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "10px",
+                    padding: "12px",
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    borderRadius: "8px",
+                    backgroundColor: formLoading ? "#f1f5f9" : "#ffffff",
+                    maxHeight: "260px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {licenseTypes.map((licenseType) => {
+                    const selected = formData.licenses?.find(
+                      (item) => item.licenseTypeId === licenseType.id
+                    );
+                    return (
+                      <div
+                        key={licenseType.id}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                          gap: "12px",
+                          alignItems: "center",
+                          padding: "10px 12px",
+                          border: selected ? "1px solid #bfdbfe" : "1px solid #e2e8f0",
+                          borderRadius: "8px",
+                          background: selected ? "#eff6ff" : "#ffffff",
+                        }}
+                      >
+                        <FormCheckbox
+                          label={licenseType.name}
+                          checked={!!selected}
+                          onChange={() => handleLicenseToggle(licenseType.id)}
+                          disabled={formLoading}
+                        />
+                        {selected && (
+                          <label style={{ display: "grid", gap: "4px", fontSize: "0.8125rem" }}>
+                            <span style={{ color: "#475569", fontWeight: 600 }}>Vence</span>
+                            <input
+                              type="date"
+                              value={selected.expirationDate}
+                              onChange={(e) =>
+                                handleLicenseExpirationChange(licenseType.id, e.target.value)
+                              }
+                              min={editingUser ? "1970-01-01" : todayDateInputValue()}
+                              required
+                              disabled={formLoading}
+                              style={{
+                                width: "100%",
+                                height: "36px",
+                                borderRadius: "8px",
+                                border: "1px solid rgba(0,0,0,0.15)",
+                                padding: "0 10px",
+                                fontSize: "0.875rem",
+                                color: "#1e293b",
+                                background: formLoading ? "#f1f5f9" : "#ffffff",
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {(!formData.licenses || formData.licenses.length === 0) && (
+                <div style={{ marginTop: "6px", fontSize: "0.875rem", color: "#ef4444" }}>
+                  Obligatorio para roles Guía o Conductor: seleccione al menos una licencia
+                </div>
+              )}
+            </div>
           )}
 
           {requiresLanguages && (

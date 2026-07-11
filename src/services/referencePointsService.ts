@@ -44,6 +44,14 @@ export async function fetchReferencePointsWithPagination(
   return { items: [], total: 0, page, pageSize: limit, totalPages: 0 };
 }
 
+export async function fetchBookingReferencePoints(): Promise<ReferencePoint[]> {
+  const { data } = await api.get<any>("/api/reference-points/select");
+  if (data.items && Array.isArray(data.items)) {
+    return data.items.map(mapApiReferencePoint);
+  }
+  return [];
+}
+
 export async function getReferencePointById(id: string): Promise<ReferencePoint> {
   const { data } = await api.get<any>(`/api/reference-points/${id}`);
   return mapApiReferencePoint(data);

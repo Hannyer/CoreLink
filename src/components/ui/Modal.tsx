@@ -1,6 +1,6 @@
 import React, { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { Button } from './Button';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'fullscreen';
 
@@ -42,6 +42,8 @@ export function Modal({
   panelStyle,
   bodyStyle,
 }: ModalProps) {
+  const isMobile = useMediaQuery('(max-width: 767.98px)');
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -75,9 +77,9 @@ export function Modal({
         bottom: 0,
         zIndex: 1050,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: isMobile ? 'flex-start' : 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: isMobile ? '10px' : '20px',
         background: 'rgba(0, 0, 0, 0.5)',
         backdropFilter: 'blur(4px)',
         animation: 'fadeIn 0.2s ease-out',
@@ -88,14 +90,14 @@ export function Modal({
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '12px',
+          borderRadius: isMobile ? '10px' : '12px',
           width: '100%',
-          maxHeight: '90vh',
+          maxHeight: isMobile ? 'calc(100dvh - 20px)' : '90vh',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
           animation: 'slideUp 0.3s ease-out',
-          ...sizeStyles[size],
+          ...(isMobile ? { maxWidth: '100%' } : sizeStyles[size]),
           ...panelStyle,
         }}
         onClick={(e) => e.stopPropagation()}
@@ -107,12 +109,12 @@ export function Modal({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '20px 24px',
+              padding: isMobile ? '14px 16px' : '20px 24px',
               borderBottom: '1px solid rgba(0,0,0,0.06)',
             }}
           >
             {title && (
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: '#0f172a' }}>
+              <h2 style={{ margin: 0, fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 600, color: '#0f172a' }}>
                 {title}
               </h2>
             )}
@@ -148,7 +150,7 @@ export function Modal({
         <div
           style={{
             flex: 1,
-            padding: '24px',
+            padding: isMobile ? '16px' : '24px',
             overflowY: 'auto',
             color: '#1e293b',
             minHeight: 0,
@@ -162,11 +164,12 @@ export function Modal({
         {footer && (
           <div
             style={{
-              padding: '16px 24px',
+              padding: isMobile ? '12px 16px' : '16px 24px',
               borderTop: '1px solid rgba(0,0,0,0.06)',
               display: 'flex',
-              justifyContent: 'flex-end',
+              justifyContent: isMobile ? 'stretch' : 'flex-end',
               gap: '12px',
+              flexWrap: 'wrap',
             }}
           >
             {footer}

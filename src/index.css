@@ -2,17 +2,18 @@ html,
 body,
 #root {
   height: 100%;
-  overflow: hidden;
+  min-width: 0;
 }
 
 body {
   margin: 0;
+  overflow-x: hidden;
 }
 
 /* ===== Shell general y fondos (combina con login) ===== */
 .app-shell {
-  height: 100vh;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
   background:
     radial-gradient(1000px 600px at 110% -10%, rgba(34, 197, 94, 0.16), rgba(15, 23, 42, 0) 60%),
@@ -20,7 +21,7 @@ body {
 }
 
 .main-surface {
-  height: 100vh;
+  height: 100dvh;
   min-width: 0;
   overflow: hidden;
 }
@@ -29,7 +30,7 @@ body {
 .sidebar {
   color: #fff;
   transition: width .25s ease-in-out, transform .3s ease-in-out;
-  height: 100vh;
+  height: 100dvh;
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -58,7 +59,7 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    height: 100vh;
+    height: 100dvh;
     width: 260px !important;
     z-index: 1050;
     transform: translateX(-100%);
@@ -141,6 +142,21 @@ body {
   height: 100%;
   min-height: 0;
   overflow: auto;
+}
+
+@media (max-width: 767.98px) {
+  .content-surface {
+    padding: 3.75rem .75rem .75rem !important;
+  }
+
+  .glass-card {
+    padding: .75rem !important;
+    border-radius: 10px;
+  }
+
+  .bg-footer {
+    display: none;
+  }
 }
 
 /* ===== Footer ===== */

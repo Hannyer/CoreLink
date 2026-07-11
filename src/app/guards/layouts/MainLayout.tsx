@@ -1,12 +1,10 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { logout } from "@/services/authService";
 import {
   CalendarCheck,
   LogOut,
   Menu,
-  Search,
   X,
-  FilePlus2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -147,45 +145,16 @@ export default function MainLayout() {
 
       {/* Main Content */}
       <div className="flex-grow-1 d-flex flex-column main-surface">
-        {/* Topbar */}
-        <header className="topbar px-3 px-md-4 py-2 d-flex align-items-center justify-content-between gap-2">
-          {/* Botón hamburguesa para móvil */}
-          {isMobile && (
-            <button
-              className="btn btn-outline-light d-lg-none d-flex align-items-center justify-content-center"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Abrir menú"
-            >
-              <Menu size={20} />
-            </button>
-          )}
-
-          <div className="input-group topbar-search flex-grow-1" style={{ maxWidth: isMobile ? '100%' : '400px' }}>
-            <span className="input-group-text bg-transparent border-0">
-              <Search size={18} />
-            </span>
-            <input
-              type="text"
-              className="form-control border-0"
-              placeholder={isMobile ? "Buscar…" : "Buscar reserva, cliente, guía, unidad…"}
-            />
-          </div>
-
-          <div className="d-flex align-items-center gap-2">
-            <NavLink 
-              to="/bookings" 
-              className={`btn btn-success d-flex align-items-center gap-2 ${isMobile ? 'btn-sm' : ''}`}
-            >
-              {isMobile ? (
-                <FilePlus2 size={18} />
-              ) : (
-                <>
-                  <FilePlus2 size={18} /> Nueva reserva
-                </>
-              )}
-            </NavLink>
-          </div>
-        </header>
+        {isMobile && (
+          <button
+            className="btn btn-outline-light d-lg-none d-flex align-items-center justify-content-center"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Abrir menú"
+            style={{ position: "fixed", top: 12, left: 12, zIndex: 1040 }}
+          >
+            <Menu size={20} />
+          </button>
+        )}
 
         {/* Content */}
         <main className="p-3 p-md-4 content-surface flex-grow-1">

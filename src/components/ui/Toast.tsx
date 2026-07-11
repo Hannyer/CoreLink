@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 import type { Toast, ToastVariant } from '@/hooks/useToast';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface ToastProps {
   toast: Toast;
@@ -39,6 +40,8 @@ const icons: Record<ToastVariant, React.ReactNode> = {
 };
 
 export function ToastComponent({ toast, onRemove, position = 'top-right' }: ToastProps) {
+  const isMobile = useMediaQuery('(max-width: 767.98px)');
+
   useEffect(() => {
     if (toast.duration && toast.duration > 0) {
       const timer = setTimeout(() => {
@@ -48,7 +51,12 @@ export function ToastComponent({ toast, onRemove, position = 'top-right' }: Toas
     }
   }, [toast.duration, toast.id, onRemove]);
 
-  const positionStyles: Record<string, React.CSSProperties> = {
+  const positionStyles: Record<string, React.CSSProperties> = isMobile ? {
+    'top-right': { top: '12px', left: '12px', right: '12px' },
+    'top-left': { top: '12px', left: '12px', right: '12px' },
+    'bottom-right': { bottom: '12px', left: '12px', right: '12px' },
+    'bottom-left': { bottom: '12px', left: '12px', right: '12px' },
+  } : {
     'top-right': { top: '20px', right: '20px' },
     'top-left': { top: '20px', left: '20px' },
     'bottom-right': { bottom: '20px', right: '20px' },
@@ -61,8 +69,9 @@ export function ToastComponent({ toast, onRemove, position = 'top-right' }: Toas
         position: 'fixed',
         ...positionStyles[position],
         zIndex: 10000,
-        minWidth: '300px',
-        maxWidth: '400px',
+        minWidth: isMobile ? 0 : '300px',
+        maxWidth: isMobile ? 'none' : '400px',
+        width: isMobile ? 'auto' : undefined,
         background: variantStyles[toast.variant].background,
         color: variantStyles[toast.variant].color,
         border: `1px solid ${variantStyles[toast.variant].borderColor}`,

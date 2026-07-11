@@ -12,6 +12,19 @@ import { Home } from "lucide-react";
 
 const SECTION_ORDER = ["Reservas", "Operación", "Gestión", "Seguridad"];
 
+const HOME_ITEM: DynamicMenuItem = {
+  id: "home",
+  code: "home",
+  name: "Inicio",
+  icon: "Home",
+  routePath: "/home",
+  section: null,
+  sortOrder: -1,
+  canRead: true,
+  canWrite: false,
+  canDelete: false,
+};
+
 interface DynamicSidebarNavProps {
   collapsed: boolean;
   isMobile: boolean;
@@ -72,25 +85,17 @@ export default function DynamicSidebarNav({
       .catch((e) => console.warn("Menú dinámico no disponible:", e));
   }, [menuData?.roleId, menuData?.items?.length]);
 
-  const unsectioned = menuData?.unsectioned ?? [];
+  const unsectioned = [
+    HOME_ITEM,
+    ...(menuData?.unsectioned ?? []).filter((item) => item.routePath !== "/home"),
+  ];
   const sections = menuData?.sections ?? {};
 
   if (!menuData?.items?.length) {
     return (
       <ul className="nav flex-column gap-1">
         <NavItem
-          item={{
-            id: "fallback-home",
-            code: "home",
-            name: "Inicio",
-            icon: "Home",
-            routePath: "/home",
-            section: null,
-            sortOrder: 0,
-            canRead: true,
-            canWrite: false,
-            canDelete: false,
-          }}
+          item={HOME_ITEM}
           collapsed={collapsed}
           isMobile={isMobile}
           linkCls={linkCls}

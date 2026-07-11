@@ -16,34 +16,46 @@ interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'siz
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   primary: {
-    background: '#22c55e',
-    color: '#062415',
-    border: 'none',
+    background: '#0f766e',
+    color: '#ffffff',
+    borderWidth: 0,
+    borderStyle: 'solid',
+    borderColor: 'transparent',
   },
   secondary: {
-    background: 'rgba(255,255,255,0.1)',
-    color: '#fff',
-    border: '1px solid rgba(255,255,255,0.2)',
+    background: '#ffffff',
+    color: '#152331',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#d9e2ea',
   },
   success: {
-    background: '#22c55e',
-    color: '#062415',
-    border: 'none',
+    background: '#0f766e',
+    color: '#ffffff',
+    borderWidth: 0,
+    borderStyle: 'solid',
+    borderColor: 'transparent',
   },
   danger: {
     background: '#ef4444',
     color: '#fff',
-    border: 'none',
+    borderWidth: 0,
+    borderStyle: 'solid',
+    borderColor: 'transparent',
   },
   outline: {
     background: 'transparent',
     color: '#475569',
-    border: '1px solid #cbd5e1',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#cbd5e1',
   },
   ghost: {
     background: 'transparent',
-    color: '#fff',
-    border: 'none',
+    color: '#152331',
+    borderWidth: 0,
+    borderStyle: 'solid',
+    borderColor: 'transparent',
   },
 };
 
@@ -79,16 +91,16 @@ const baseStyles: React.CSSProperties = {
 };
 
 const hoverStyles: Record<ButtonVariant, React.CSSProperties> = {
-  primary: { background: '#16a34a', transform: 'translateY(-1px)' },
-  secondary: { background: 'rgba(255,255,255,0.15)' },
-  success: { background: '#16a34a', transform: 'translateY(-1px)' },
+  primary: { background: '#115e59', transform: 'translateY(-1px)' },
+  secondary: { background: '#f8fafc', borderColor: '#c8d5df' },
+  success: { background: '#115e59', transform: 'translateY(-1px)' },
   danger: { background: '#dc2626', transform: 'translateY(-1px)' },
   outline: { 
     background: '#f1f5f9', 
     borderColor: '#94a3b8',
     color: '#334155',
   },
-  ghost: { background: 'rgba(255,255,255,0.08)' },
+  ghost: { background: 'rgba(15,31,46,0.06)' },
 };
 
 export function Button({

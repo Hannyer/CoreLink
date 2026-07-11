@@ -44,9 +44,9 @@ export function FormSelect({
   const baseSelectStyles: React.CSSProperties = {
     width: fullWidth ? '100%' : 'auto',
     borderRadius: '8px',
-    border: error 
-      ? '1px solid #ef4444' 
-      : '1px solid rgba(0,0,0,0.15)',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: error ? '#ef4444' : 'rgba(0,0,0,0.15)',
     transition: 'all 0.2s ease',
     outline: 'none',
     backgroundColor: disabled ? '#f1f5f9' : '#ffffff',

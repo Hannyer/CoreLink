@@ -72,8 +72,8 @@ export default function MainLayout() {
       </div>
       {!collapsed && (
         <div className="d-flex flex-column lh-1">
-          <span className="fw-semibold text-white">Operaciones</span>
-          <small className="text-white-50">Turísticas</small>
+          <span className="fw-semibold text-white">CoreLink</span>
+          <small className="text-white-50">Operations</small>
         </div>
       )}
     </div>
@@ -111,13 +111,18 @@ export default function MainLayout() {
         }`}
         style={!isMobile ? { width: collapsed ? "84px" : "260px" } : undefined}
       >
-        <div className="d-flex align-items-center justify-content-between p-3 border-bottom border-opacity-10">
+        <div
+          className={`sidebar-header d-flex align-items-center justify-content-between p-3 border-bottom border-opacity-10 ${
+            collapsed && !isMobile ? "sidebar-header-collapsed" : ""
+          }`}
+        >
           <Brand />
           <button
-            className="btn btn-sm btn-outline-light ms-2"
+            className="sidebar-toggle-btn btn btn-sm ms-2"
             onClick={handleSidebarToggle}
-            aria-label="Alternar menú"
-            title="Alternar menú"
+            aria-label={isMobile ? "Cerrar menú" : collapsed ? "Expandir menú" : "Contraer menú"}
+            aria-expanded={isMobile ? mobileMenuOpen : !collapsed}
+            title={isMobile ? "Cerrar menú" : collapsed ? "Expandir menú" : "Contraer menú"}
           >
             {isMobile ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -145,12 +150,11 @@ export default function MainLayout() {
 
       {/* Main Content */}
       <div className="flex-grow-1 d-flex flex-column main-surface">
-        {isMobile && (
+        {isMobile && !mobileMenuOpen && (
           <button
-            className="btn btn-outline-light d-lg-none d-flex align-items-center justify-content-center"
+            className="mobile-menu-toggle d-lg-none d-flex align-items-center justify-content-center"
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Abrir menú"
-            style={{ position: "fixed", top: 12, left: 12, zIndex: 1040 }}
           >
             <Menu size={20} />
           </button>
@@ -165,7 +169,7 @@ export default function MainLayout() {
 
         {/* Footer */}
         <footer className="text-center text-white-50 py-2 small bg-footer">
-          © {new Date().getFullYear()} Operaciones Turísticas — Gestión de reservas y operaciones
+          © {new Date().getFullYear()} CoreLink Operations · Gestión de reservas y operación turística
         </footer>
       </div>
     </div>

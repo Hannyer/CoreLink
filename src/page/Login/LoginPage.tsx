@@ -2,13 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { login } from "@/services/authService";
 import type { AxiosError } from "axios";
-import { Eye, EyeOff, ShieldCheck, Mail, Lock } from "lucide-react";
-
-
-
-const bgUrl =
-  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1920"; 
-
+import { CalendarCheck, Eye, EyeOff, Lock, Mail, MapPinned, ShieldCheck, UsersRound } from "lucide-react";
 
 const LoginPage = () => {
   const [username, setUsername] = useState("");
@@ -41,66 +35,76 @@ const LoginPage = () => {
 
    return (
     <div className="auth-bg min-vh-100 d-flex align-items-stretch">
-      {/* Lado visual (hero) */}
-      <aside className="d-none d-lg-flex flex-column justify-content-between text-white p-5 auth-hero"
-             style={{ // usa la imagen de fondo del login
-               // Si ya definiste la imagen en CSS con --auth-image, puedes omitir esto:
-               backgroundImage: `linear-gradient(rgba(15,23,42,.55), rgba(15,23,42,.35)), url(${bgUrl})`,
-               backgroundRepeat: "no-repeat",
-               backgroundPosition: "left center",
-               backgroundSize: "cover"
-             }}>
+      <aside className="d-none d-lg-flex flex-column justify-content-between text-white p-5 auth-hero">
         <div className="d-flex align-items-center gap-3">
           <div className="logo-badge" aria-hidden="true">
             <ShieldCheck size={22} />
           </div>
           <div>
-            <h1 className="h4 mb-0 fw-semibold">Operaciones Turísticas</h1>
-            <small className="text-white-50">Gestión de reservas, operaciones y recursos</small>
+            <h1 className="h4 mb-0 fw-semibold">CoreLink Operations</h1>
+            <small className="text-white-50">Control operativo para experiencias turísticas</small>
           </div>
         </div>
 
         <div className="mt-auto">
-          <h2 className="display-6 fw-bold lh-tight mb-3">
-            Planifica actividades y coordina equipos
+          <span className="badge auth-badge mb-3">Panel empresarial</span>
+          <h2 className="display-6 fw-bold lh-tight mb-3" style={{ maxWidth: 620 }}>
+            Administra reservas, actividades y traslados con precisión diaria
           </h2>
-          <p className="text-white-75 mb-4">
-            Centraliza reservas, asigna guías y unidades, controla horarios y genera reportes en un solo lugar.
+          <p className="text-white-75 mb-4" style={{ maxWidth: 560 }}>
+            Un espacio centralizado para equipos de operación: agenda actividades, asigna guías, coordina vehículos y controla puntos de recogida desde una sola plataforma.
           </p>
-          <ul className="list-unstyled mb-0">
-            <li className="mb-2">✔ Ingreso y gestión de reservas con calendario (hasta 5 años)</li>
-            <li className="mb-2">✔ Transporte: puntos de recogida y horarios</li>
-            <li className="mb-2">✔ Comisiones y reportes periódicos</li>
-            <li className="mb-2">✔ Asignación de guías (líder/normal) y unidades disponibles</li>
+          <ul className="list-unstyled mb-4 auth-feature-list">
+            <li className="mb-2">Reservas conectadas con calendario, clientes y empresas.</li>
+            <li className="mb-2">Asignación operativa de guías, conductores y unidades.</li>
+            <li className="mb-2">Traslados con punto de referencia y hora de recogida.</li>
           </ul>
+          <div className="auth-kpi">
+            <div className="auth-kpi-item">
+              <CalendarCheck size={17} className="mb-2" />
+              <span className="auth-kpi-value">Agenda</span>
+              <span className="auth-kpi-label">Actividades</span>
+            </div>
+            <div className="auth-kpi-item">
+              <UsersRound size={17} className="mb-2" />
+              <span className="auth-kpi-value">Equipo</span>
+              <span className="auth-kpi-label">Guías y roles</span>
+            </div>
+            <div className="auth-kpi-item">
+              <MapPinned size={17} className="mb-2" />
+              <span className="auth-kpi-value">Rutas</span>
+              <span className="auth-kpi-label">Recogidas</span>
+            </div>
+          </div>
         </div>
 
         <div className="d-flex align-items-center justify-content-between mt-4">
-          <span className="badge auth-badge">Panel Seguro</span>
-          <small className="text-white-50">© {new Date().getFullYear()} Operaciones Turísticas</small>
+          <small className="text-white-50">Acceso seguro con permisos por rol</small>
+          <small className="text-white-50">© {new Date().getFullYear()} CoreLink</small>
         </div>
       </aside>
 
-      {/* Formulario (glass card) */}
       <main className="flex-fill d-flex align-items-center justify-content-center p-4 p-lg-5">
         <div className="auth-card w-100" style={{ maxWidth: 460 }}>
-          {/* Encabezado móvil */}
           <div className="mb-4 d-lg-none text-center">
             <div className="d-inline-flex align-items-center gap-2 mb-2">
               <div className="logo-badge" aria-hidden="true">
                 <ShieldCheck size={18} />
               </div>
               <div>
-                <h1 className="h5 mb-0 fw-semibold text-white">Operaciones Turísticas</h1>
-                <small className="text-white-50">Gestión de reservas, operaciones y recursos</small>
+                <h1 className="h5 mb-0 fw-semibold text-white">CoreLink Operations</h1>
+                <small className="text-white-50">Reservas, actividades y traslados</small>
               </div>
             </div>
           </div>
 
           <header className="mb-3">
+            <span className="badge rounded-pill mb-3" style={{ background: "var(--crm-primary-soft)", color: "var(--crm-primary-strong)" }}>
+              Portal operativo
+            </span>
             <h2 className="fw-bold mb-1 text-white">Iniciar sesión</h2>
             <p className="text-white-50 mb-0">
-              Accede con tu usuario (Administrador u Operativo)
+              Ingresa para gestionar la operación del día y las reservas programadas.
             </p>
           </header>
 
@@ -174,7 +178,7 @@ const LoginPage = () => {
             </div>
 
             <div className="form-text mb-3 text-white-50">
-              Al continuar aceptas los Términos y la Política de Privacidad.
+              El acceso está protegido y auditado según los permisos de tu rol.
             </div>
 
             <button
@@ -196,7 +200,7 @@ const LoginPage = () => {
 
           <footer className="text-center mt-4">
             <small className="text-white-50">
-              © {new Date().getFullYear()} Operaciones Turísticas — Administración y Operación
+              © {new Date().getFullYear()} CoreLink — Administración y Operación
             </small>
           </footer>
         </div>

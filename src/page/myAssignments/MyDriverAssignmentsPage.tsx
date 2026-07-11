@@ -90,7 +90,7 @@ export default function MyDriverAssignmentsPage() {
       ) : (
         <div className="d-flex flex-column gap-3">
           {items.map((item) => (
-            <div key={item.bookingId} className="p-3 rounded-3" style={{ background: "rgba(15,23,42,.65)", border: "1px solid rgba(255,255,255,.08)" }}>
+            <div key={item.bookingId} className="assignment-card p-3 rounded-3">
               <h5 className="mb-2">{item.activityTitle}</h5>
               <div className="d-flex flex-wrap gap-3 text-white-50 small mb-2">
                 <span><Clock size={14} className="me-1" />{formatDateTime(item.scheduledStart)} - {formatDateTime(item.scheduledEnd)}</span>

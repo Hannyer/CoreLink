@@ -36,6 +36,7 @@ import type { Booking, BookingAssignments, ReferencePoint, Transport } from "@/t
 import type { AxiosError } from "axios";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { FormCombobox, type SelectOption } from "@/components/form/FormCombobox";
 
 const MAX_GUIDES = 5;
 
@@ -72,6 +73,24 @@ function defaultPickupDateTime(scheduledStart?: string | null): string {
   date.setHours(date.getHours() - 1);
   return toDateTimeLocalValue(date.toISOString());
 }
+
+const toTransportOptions = (transports: Transport[]): SelectOption[] =>
+  transports.map((transport) => ({
+    value: transport.id,
+    label: `${transport.model} · ${transport.licensePlate} · Cap. ${transport.capacity}`,
+  }));
+
+const toDriverOptions = (drivers: AvailableDriver[]): SelectOption[] =>
+  drivers.map((driver) => ({
+    value: driver.id,
+    label: driver.fullName,
+  }));
+
+const toReferencePointOptions = (referencePoints: ReferencePoint[]): SelectOption[] =>
+  referencePoints.map((point) => ({
+    value: point.id,
+    label: point.description,
+  }));
 
 // ─── Badge de estado ─────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -609,42 +628,30 @@ function TransportAssignmentsSubmodule() {
                 {editing.customerName} · {formatDateTime(editing.scheduledStart)}
               </div>
             </div>
-            <select
-              className="form-select"
+            <FormCombobox
+              options={toTransportOptions(transports)}
               value={selectedTransportId}
-              onChange={(e) => setSelectedTransportId(e.target.value)}
-            >
-              <option value="">Seleccionar transporte</option>
-              {transports.map((transport) => (
-                <option key={transport.id} value={transport.id}>
-                  {transport.model} · {transport.licensePlate} · Cap. {transport.capacity}
-                </option>
-              ))}
-            </select>
-            <select
-              className="form-select mt-3"
+              onChange={(value) => setSelectedTransportId(String(value))}
+              placeholder="Seleccionar transporte"
+              searchPlaceholder="Buscar transporte..."
+              fullWidth
+            />
+            <FormCombobox
+              options={toDriverOptions(drivers)}
               value={selectedDriverId}
-              onChange={(e) => setSelectedDriverId(e.target.value)}
-            >
-              <option value="">Seleccionar conductor</option>
-              {drivers.map((driver) => (
-                <option key={driver.id} value={driver.id}>
-                  {driver.fullName}
-                </option>
-              ))}
-            </select>
-            <select
-              className="form-select mt-3"
+              onChange={(value) => setSelectedDriverId(String(value))}
+              placeholder="Seleccionar conductor"
+              searchPlaceholder="Buscar conductor..."
+              fullWidth
+            />
+            <FormCombobox
+              options={toReferencePointOptions(referencePoints)}
               value={selectedReferencePointId}
-              onChange={(e) => setSelectedReferencePointId(e.target.value)}
-            >
-              <option value="">Seleccionar punto de referencia</option>
-              {referencePoints.map((point) => (
-                <option key={point.id} value={point.id}>
-                  {point.description}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setSelectedReferencePointId(String(value))}
+              placeholder="Seleccionar punto de referencia"
+              searchPlaceholder="Buscar punto de referencia..."
+              fullWidth
+            />
             <label className="form-label mt-3 mb-1">Fecha y hora de recogida</label>
             <input
               className="form-control"
@@ -858,9 +865,10 @@ export default function OperatorPage() {
         .op-guide-lang { font-size: .68rem; color: #64748b; margin-left: auto; }
 
         /* Select de transporte */
-        .op-transport-select { background: rgba(30,41,59,.8); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: .5rem .75rem; color: #e2e8f0; font-size: .875rem; width: 100%; }
+        .op-transport-select { background: rgba(30,41,59,.8); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: .5rem .75rem; color: #e2e8f0; font-size: .875rem; width: 100%; color-scheme: light; }
         .op-transport-select:focus { outline: none; border-color: rgba(99,102,241,.5); }
-        .op-transport-select option { background: #1e293b; }
+        .op-transport-select option { background: #ffffff; color: #0f172a; }
+        .op-transport-select option:checked { background: #e0f2fe; color: #0f172a; }
 
         /* Info strip */
         .op-info-strip { background: rgba(99,102,241,.08); border: 1px solid rgba(99,102,241,.2); border-radius: 8px; padding: .6rem .85rem; font-size: .8rem; color: #a5b4fc; display: flex; align-items: center; gap: .5rem; }
@@ -1102,44 +1110,32 @@ export default function OperatorPage() {
                       <BusFront size={15} /> Transporte Asignado
                     </div>
                     <div className="op-section-card">
-                      <select
-                        className="op-transport-select mb-2"
+                      <FormCombobox
+                        options={toTransportOptions(availableTransports)}
                         value={selectedTransportId}
-                        onChange={(e) => setSelectedTransportId(e.target.value)}
-                      >
-                        <option value="">— Seleccionar vehículo —</option>
-                        {availableTransports.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.model} · {t.licensePlate} · Cap. {t.capacity}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(value) => setSelectedTransportId(String(value))}
+                        placeholder="— Seleccionar vehículo —"
+                        searchPlaceholder="Buscar vehículo..."
+                        fullWidth
+                      />
 
-                      <select
-                        className="op-transport-select mb-2"
+                      <FormCombobox
+                        options={toDriverOptions(availableDrivers)}
                         value={selectedDriverId}
-                        onChange={(e) => setSelectedDriverId(e.target.value)}
-                      >
-                        <option value="">— Seleccionar conductor —</option>
-                        {availableDrivers.map((driver) => (
-                          <option key={driver.id} value={driver.id}>
-                            {driver.fullName}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(value) => setSelectedDriverId(String(value))}
+                        placeholder="— Seleccionar conductor —"
+                        searchPlaceholder="Buscar conductor..."
+                        fullWidth
+                      />
 
-                      <select
-                        className="op-transport-select mb-2"
+                      <FormCombobox
+                        options={toReferencePointOptions(referencePoints)}
                         value={selectedReferencePointId}
-                        onChange={(e) => setSelectedReferencePointId(e.target.value)}
-                      >
-                        <option value="">— Seleccionar punto de referencia —</option>
-                        {referencePoints.map((point) => (
-                          <option key={point.id} value={point.id}>
-                            {point.description}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(value) => setSelectedReferencePointId(String(value))}
+                        placeholder="— Seleccionar punto de referencia —"
+                        searchPlaceholder="Buscar punto de referencia..."
+                        fullWidth
+                      />
 
                       <label className="op-panel-meta mb-1 d-block">Fecha y hora de recogida</label>
                       <input

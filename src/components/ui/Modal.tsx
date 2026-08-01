@@ -11,6 +11,7 @@ interface ModalProps {
   children: ReactNode;
   size?: ModalSize;
   showCloseButton?: boolean;
+  /** Se mantiene por compatibilidad; las modales no se cierran al hacer click fuera. */
   closeOnBackdropClick?: boolean;
   footer?: ReactNode;
   className?: string;
@@ -36,7 +37,6 @@ export function Modal({
   children,
   size = 'md',
   showCloseButton = true,
-  closeOnBackdropClick = true,
   footer,
   className = '',
   panelStyle,
@@ -85,7 +85,6 @@ export function Modal({
         backdropFilter: 'blur(8px)',
         animation: 'fadeIn 0.2s ease-out',
       }}
-      onClick={closeOnBackdropClick ? onClose : undefined}
       className={className}
     >
       <div

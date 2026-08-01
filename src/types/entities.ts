@@ -416,7 +416,6 @@ export interface UserFormData {
   roleId: string;
   languageIds?: string[];
   licenses?: UserLicense[];
-  speaksEnglish?: boolean;
   status?: boolean;
 }
 
@@ -640,6 +639,8 @@ export interface ApiError {
 export interface Company {
   id: string;
   name: string;
+  email: string;
+  phone: string;
   commissionPercentage: number; // Porcentaje de comisión (0-100)
   status: boolean; // true = activa, false = inactiva
   createdAt: string;
@@ -648,6 +649,8 @@ export interface Company {
 
 export interface CompanyFormData {
   name: string;
+  email: string;
+  phone: string;
   commissionPercentage: number;
   status?: boolean;
 }
@@ -674,6 +677,7 @@ export interface Booking {
   adultCount: number;
   childCount: number;
   seniorCount: number;
+  infantCount: number;
   passengerCount?: number | null;
   commissionPercentage: number;
   /** Subtotal antes de IVA (persistido por API) */
@@ -709,12 +713,13 @@ export interface BookingFormData {
   companyId?: string | null;
   transport?: boolean;
   paymentTypeId?: string | null;
-  cardTypeId?: string | null;
   referencePointId?: string | null;
+  referencePointDescription?: string | null;
   numberOfPeople: number;
   adultCount: number;
   childCount: number;
   seniorCount: number;
+  infantCount: number;
   passengerCount?: number | null;
   commissionPercentage?: number;
   subtotal?: number | null;
@@ -723,7 +728,7 @@ export interface BookingFormData {
   exempt?: boolean;
   commissionAmount?: number | null;
   customerName: string;
-  customerEmail?: string | null;
+  customerEmail: string;
   customerPhone?: string | null;
   comment?: string | null;
   status?: BookingStatus;

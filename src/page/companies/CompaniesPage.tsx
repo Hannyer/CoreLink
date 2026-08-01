@@ -55,6 +55,8 @@ export default function CompaniesPage() {
 
   const [formData, setFormData] = useState<CompanyFormData & { commissionPercentageInput: string | number }>({
     name: "",
+    email: "",
+    phone: "",
     commissionPercentage: 0,
     commissionPercentageInput: "",
     status: true,
@@ -83,6 +85,8 @@ export default function CompaniesPage() {
     setEditingCompany(null);
     setFormData({
       name: "",
+      email: "",
+      phone: "",
       commissionPercentage: 0,
       commissionPercentageInput: "",
       status: true,
@@ -94,6 +98,8 @@ export default function CompaniesPage() {
     setEditingCompany(company);
     setFormData({
       name: company.name,
+      email: company.email,
+      phone: company.phone,
       commissionPercentage: company.commissionPercentage,
       commissionPercentageInput: company.commissionPercentage,
       status: company.status,
@@ -147,6 +153,21 @@ export default function CompaniesPage() {
       return;
     }
 
+    if (!formData.email.trim()) {
+      toast.error("El correo es requerido");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast.error("El correo debe tener un formato válido");
+      return;
+    }
+
+    if (!formData.phone.trim()) {
+      toast.error("El teléfono es requerido");
+      return;
+    }
+
     // Validar porcentaje de comisión: debe tener un valor y estar entre 0 y 100
     const commissionValue = typeof formData.commissionPercentageInput === 'string' 
       ? (formData.commissionPercentageInput.trim() === '' ? null : parseFloat(formData.commissionPercentageInput.trim()))
@@ -167,6 +188,8 @@ export default function CompaniesPage() {
 
       const payload: CompanyFormData = {
         name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
         commissionPercentage: commissionValue,
         status: formData.status,
       };
@@ -191,6 +214,8 @@ export default function CompaniesPage() {
 
   const columns: Column<Company>[] = [
     { key: "name", header: "Nombre", accessor: (c) => c.name },
+    { key: "email", header: "Correo", accessor: (c) => c.email },
+    { key: "phone", header: "Teléfono", accessor: (c) => c.phone },
     {
       key: "commissionPercentage",
       header: "Comisión (%)",
@@ -338,6 +363,28 @@ export default function CompaniesPage() {
             fullWidth
             disabled={formLoading}
             placeholder="Ej: Tourismo ABC S.A."
+          />
+
+          <FormInput
+            label="Correo"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            required
+            fullWidth
+            disabled={formLoading}
+            placeholder="contacto@empresa.com"
+          />
+
+          <FormInput
+            label="Teléfono"
+            type="tel"
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            required
+            fullWidth
+            disabled={formLoading}
+            placeholder="+506 8888-8888"
           />
 
           <FormInput

@@ -789,11 +789,18 @@ export default function OperatorPage() {
   );
 
   // ── ¿Se puede confirmar? ──
+  const selectedTransportReferenceDescription =
+    assignments?.transport?.referencePointDescription ||
+    selectedBooking?.referencePointDescription ||
+    "";
+  const hasTransportReference =
+    Boolean(selectedReferencePointId) || Boolean(selectedTransportReferenceDescription.trim());
+
   const canConfirm =
     selectedBooking &&
     (assignments?.guides.length ?? 0) > 0 &&
     (!selectedBooking.transport ||
-      (!!selectedTransportId && !!selectedDriverId && !!selectedReferencePointId && !!pickupAt));
+      (!!selectedTransportId && !!selectedDriverId && hasTransportReference && !!pickupAt));
 
   return (
     <>
@@ -1059,7 +1066,7 @@ export default function OperatorPage() {
                       Esta reserva requiere transporte. Debes asignar un conductor.
                     </div>
                   )}
-                  {selectedBooking.transport && !selectedReferencePointId && (
+                  {selectedBooking.transport && !hasTransportReference && (
                     <div className="op-warn-strip">
                       <AlertCircle size={14} />
                       Esta reserva requiere punto de referencia para la recogida.
@@ -1137,6 +1144,13 @@ export default function OperatorPage() {
                         fullWidth
                       />
 
+                      {!selectedReferencePointId && selectedTransportReferenceDescription && (
+                        <div className="op-info-strip mb-2">
+                          <BusFront size={13} />
+                          Referencia manual de la reserva: <strong>{selectedTransportReferenceDescription}</strong>
+                        </div>
+                      )}
+
                       <label className="op-panel-meta mb-1 d-block">Fecha y hora de recogida</label>
                       <input
                         className="op-transport-select mb-2"
@@ -1179,7 +1193,7 @@ export default function OperatorPage() {
                       <AlertCircle size={12} color="#fbbf24" /> Asigna un conductor
                     </span>
                   )}
-                  {selectedBooking.transport && !selectedReferencePointId && (
+                  {selectedBooking.transport && !hasTransportReference && (
                     <span className="d-flex align-items-center gap-1">
                       <AlertCircle size={12} color="#fbbf24" /> Selecciona el punto de referencia
                     </span>

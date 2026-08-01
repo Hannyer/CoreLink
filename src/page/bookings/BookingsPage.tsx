@@ -11,7 +11,6 @@ import {
   getBookingConfigurationById,
 } from "@/services/bookingsService";
 import { fetchPaymentTypesWithPagination } from "@/services/paymentTypesService";
-import { fetchCardTypesWithPagination } from "@/services/cardTypesService";
 import { fetchActivitiesWithPagination } from "@/services/activityService";
 import { fetchCompaniesWithPagination } from "@/services/companiesService";
 import { fetchBookingReferencePoints } from "@/services/referencePointsService";
@@ -44,7 +43,6 @@ import type {
   AvailableSchedule,
   AvailabilityInfo,
   PaymentType,
-  CardType,
   ReferencePoint,
 } from "@/types/entities";
 import type { AxiosError } from "axios";
@@ -53,9 +51,7 @@ import type { AxiosError } from "axios";
  * Función helper para extraer el mensaje de error del formato del API
  *
  * Cambios recientes en esta página:
- * - Se agregó soporte para seleccionar tipo de pago (`paymentTypeId`) y tipo de tarjeta (`cardTypeId`)
- *   consumiendo los catálogos `/api/payment-types` y `/api/card-types`.
- * - Cuando el tipo de pago es "Tarjeta", el tipo de tarjeta es obligatorio antes de crear/actualizar la reserva.
+ * - Se agregó soporte para seleccionar tipo de pago (`paymentTypeId`) consumiendo `/api/payment-types`.
  * - El payload POST/PUT incluye montos (`subtotal`, `vatAmount`, `total`), `exempt` y `commissionAmount`
  *   alineados con el cálculo del asistente (precios por categoría, IVA y comisión).
  */
@@ -109,8 +105,8 @@ export default function BookingsPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [paymentTypes, setPaymentTypes] = useState<PaymentType[]>([]);
-  const [cardTypes, setCardTypes] = useState<CardType[]>([]);
   const [referencePoints, setReferencePoints] = useState<ReferencePoint[]>([]);
+  const [useManualReferencePoint, setUseManualReferencePoint] = useState(false);
   const [catalogsLoading, setCatalogsLoading] = useState(false);
   const [ivaPercentage, setIvaPercentage] = useState(0);
 
@@ -120,14 +116,15 @@ export default function BookingsPage() {
       adultCountInput: string | number;
       childCountInput: string | number;
       seniorCountInput: string | number;
+      infantCountInput: string | number;
       exonerateTax: boolean;
     }
   >({
     activityScheduleId: "",
     companyId: null,
     paymentTypeId: null,
-    cardTypeId: null,
     referencePointId: null,
+    referencePointDescription: null,
     transport: false,
     numberOfPeople: 1,
     numberOfPeopleInput: "",
@@ -137,10 +134,12 @@ export default function BookingsPage() {
     childCountInput: "",
     seniorCount: 0,
     seniorCountInput: "",
+    infantCount: 0,
+    infantCountInput: "",
     passengerCount: null,
     commissionPercentage: undefined,
     customerName: "",
-    customerEmail: null,
+    customerEmail: "",
     customerPhone: null,
     comment: "",
     exonerateTax: false,
@@ -189,17 +188,6 @@ export default function BookingsPage() {
     [paymentTypes]
   );
 
-  const cardTypeOptions: SelectOption[] = useMemo(
-    () =>
-      cardTypes
-        .filter((c) => c.status)
-        .map((cardType) => ({
-          value: cardType.id,
-          label: cardType.name,
-        })),
-    [cardTypes]
-  );
-
   const referencePointOptions: SelectOption[] = useMemo(
     () =>
       referencePoints
@@ -211,11 +199,25 @@ export default function BookingsPage() {
     [referencePoints]
   );
 
-  const selectedReferencePointLabel = useMemo(
-    () =>
-      referencePoints.find((point) => point.id === formData.referencePointId)?.description ?? "—",
-    [referencePoints, formData.referencePointId]
-  );
+  const selectedReferencePointLabel = useMemo(() => {
+    if (!formData.transport) return "—";
+
+    if (useManualReferencePoint) {
+      return formData.referencePointDescription?.trim() || "—";
+    }
+
+    return (
+      referencePoints.find((point) => point.id === formData.referencePointId)?.description ??
+      formData.referencePointDescription?.trim() ??
+      "—"
+    );
+  }, [
+    formData.referencePointDescription,
+    formData.referencePointId,
+    formData.transport,
+    referencePoints,
+    useManualReferencePoint,
+  ]);
 
   const scheduleOptions: SelectOption[] = useMemo(
     () =>
@@ -281,17 +283,15 @@ export default function BookingsPage() {
   const loadCatalogs = async () => {
     try {
       setCatalogsLoading(true);
-      const [activitiesRes, companiesRes, paymentTypesRes, cardTypesRes, referencePointsRes] = await Promise.all([
+      const [activitiesRes, companiesRes, paymentTypesRes, referencePointsRes] = await Promise.all([
         fetchActivitiesWithPagination(1, 100, true),
         fetchCompaniesWithPagination(1, 100, true),
         fetchPaymentTypesWithPagination(1, 50),
-        fetchCardTypesWithPagination(1, 50),
         fetchBookingReferencePoints(),
       ]);
       setActivities(activitiesRes.items);
       setCompanies(companiesRes.items);
       setPaymentTypes(paymentTypesRes.items);
-      setCardTypes(cardTypesRes.items);
       setReferencePoints(referencePointsRes);
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
@@ -376,6 +376,7 @@ export default function BookingsPage() {
 
   const handleCreateBooking = () => {
     setEditingBooking(null);
+    setUseManualReferencePoint(false);
     setSelectedActivityId("");
     setSelectedScheduleId("");
     setSelectedSchedule(null);
@@ -384,8 +385,8 @@ export default function BookingsPage() {
       activityScheduleId: "",
       companyId: null,
       paymentTypeId: null,
-      cardTypeId: null,
       referencePointId: null,
+      referencePointDescription: null,
       transport: false,
       numberOfPeople: 1,
       numberOfPeopleInput: "",
@@ -395,10 +396,12 @@ export default function BookingsPage() {
       childCountInput: "",
       seniorCount: 0,
       seniorCountInput: "",
+      infantCount: 0,
+      infantCountInput: "",
       passengerCount: null,
       commissionPercentage: undefined,
       customerName: "",
-      customerEmail: null,
+      customerEmail: "",
       customerPhone: null,
       comment: "",
       exonerateTax: false,
@@ -425,6 +428,13 @@ export default function BookingsPage() {
       setFormLoading(true);
       const booking = await getBookingById(bookingRow.id);
       setEditingBooking(booking);
+      setUseManualReferencePoint(
+        Boolean(
+          booking.transport &&
+            !booking.referencePointId &&
+            booking.referencePointDescription?.trim()
+        )
+      );
       setSelectedActivityId(booking.activityId || "");
       setSelectedScheduleId(booking.activityScheduleId);
       
@@ -441,8 +451,8 @@ export default function BookingsPage() {
         activityScheduleId: booking.activityScheduleId,
         companyId: booking.companyId ?? null,
         paymentTypeId: booking.paymentTypeId ?? null,
-        cardTypeId: booking.cardTypeId ?? null,
         referencePointId: booking.referencePointId ?? null,
+        referencePointDescription: booking.referencePointDescription ?? null,
         transport: booking.transport,
         numberOfPeople: booking.numberOfPeople,
         numberOfPeopleInput: booking.numberOfPeople,
@@ -452,10 +462,12 @@ export default function BookingsPage() {
         childCountInput: booking.childCount ?? 0,
         seniorCount: booking.seniorCount ?? 0,
         seniorCountInput: booking.seniorCount ?? 0,
+        infantCount: booking.infantCount ?? 0,
+        infantCountInput: booking.infantCount ?? 0,
         passengerCount: booking.passengerCount ?? null,
         commissionPercentage: booking.commissionPercentage,
         customerName: booking.customerName,
-        customerEmail: booking.customerEmail ?? null,
+        customerEmail: booking.customerEmail ?? "",
         customerPhone: booking.customerPhone ?? null,
         comment: booking.comment ?? "",
         exonerateTax: booking.exempt ?? false,
@@ -566,14 +578,15 @@ export default function BookingsPage() {
     const adultVal = parseCount(formData.adultCountInput);
     const childVal = parseCount(formData.childCountInput);
     const seniorVal = parseCount(formData.seniorCountInput);
+    const infantVal = parseCount(formData.infantCountInput);
 
-    if (adultVal < 0 || childVal < 0 || seniorVal < 0) {
-      return "Adultos, niños y adultos mayores no pueden ser negativos.";
+    if (adultVal < 0 || childVal < 0 || seniorVal < 0 || infantVal < 0) {
+      return "Adultos, niños, adultos mayores e infantes no pueden ser negativos.";
     }
 
-    const sum = adultVal + childVal + seniorVal;
+    const sum = adultVal + childVal + seniorVal + infantVal;
     if (sum <= 0) {
-      return "La suma de adultos, niños y adultos mayores debe ser mayor a 0.";
+      return "La suma de adultos, niños, adultos mayores e infantes debe ser mayor a 0.";
     }
     if (sum !== numberOfPeopleValue) {
       return `La suma por categoría (${sum}) debe coincidir con el total (${numberOfPeopleValue}).`;
@@ -583,17 +596,13 @@ export default function BookingsPage() {
   };
 
   const validateWizardStep2 = (): string | null => {
-    if (!formData.paymentTypeId) return "Selecciona un tipo de pago.";
-
-    const selectedPaymentType = paymentTypes.find((p) => p.id === formData.paymentTypeId);
-    const isCardPayment =
-      selectedPaymentType && selectedPaymentType.name.toLowerCase() === "tarjeta";
-
-    if (isCardPayment && !formData.cardTypeId) {
-      return "Selecciona un tipo de tarjeta.";
+    if (!formData.customerName.trim()) return "El nombre del cliente es obligatorio.";
+    if (!formData.customerEmail.trim()) return "El email del cliente es obligatorio.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customerEmail.trim())) {
+      return "El email del cliente debe tener un formato válido.";
     }
 
-    if (!formData.customerName.trim()) return "El nombre del cliente es obligatorio.";
+    if (!formData.paymentTypeId) return "Selecciona un tipo de pago.";
 
     if (formData.transport) {
       if (formData.passengerCount === null || formData.passengerCount === undefined) {
@@ -602,8 +611,12 @@ export default function BookingsPage() {
       if (formData.passengerCount < 1) {
         return "La cantidad de pasajeros debe ser al menos 1.";
       }
-      if (!formData.referencePointId) {
-        return "Selecciona un punto de referencia para el transporte.";
+      if (useManualReferencePoint) {
+        if (!formData.referencePointDescription?.trim()) {
+          return "Digita un punto de referencia para el transporte.";
+        }
+      } else if (!formData.referencePointId) {
+        return "Selecciona un punto de referencia o activa la referencia manual.";
       }
     }
 
@@ -670,10 +683,6 @@ export default function BookingsPage() {
       return;
     }
 
-    const selectedPaymentType = paymentTypes.find((p) => p.id === formData.paymentTypeId);
-    const isCardPayment =
-      selectedPaymentType && selectedPaymentType.name.toLowerCase() === "tarjeta";
-
     const numberOfPeopleValue =
       typeof formData.numberOfPeopleInput === "string"
         ? parseInt(formData.numberOfPeopleInput.trim(), 10)
@@ -682,6 +691,7 @@ export default function BookingsPage() {
     const adultVal = parseCount(formData.adultCountInput);
     const childVal = parseCount(formData.childCountInput);
     const seniorVal = parseCount(formData.seniorCountInput);
+    const infantVal = parseCount(formData.infantCountInput);
 
     let finalCommission: number | undefined;
     if (formData.companyId) {
@@ -701,18 +711,28 @@ export default function BookingsPage() {
       const totalPersist = roundMoney(bookingEstimatedGrandTotal);
       const commissionAmountPersist =
         formData.companyId != null ? roundMoney(bookingEstimatedCommissionAmount) : null;
+      const selectedReferencePoint = referencePoints.find(
+        (point) => point.id === formData.referencePointId
+      );
+      const referencePointDescription = formData.transport
+        ? useManualReferencePoint
+          ? formData.referencePointDescription?.trim() || null
+          : selectedReferencePoint?.description ?? formData.referencePointDescription?.trim() ?? null
+        : null;
 
       const payload: BookingFormData = {
         activityScheduleId: formData.activityScheduleId,
         companyId: formData.companyId ?? null,
         paymentTypeId: formData.paymentTypeId ?? null,
-        cardTypeId: isCardPayment ? formData.cardTypeId ?? null : null,
-        referencePointId: formData.transport ? formData.referencePointId ?? null : null,
+        referencePointId:
+          formData.transport && !useManualReferencePoint ? formData.referencePointId ?? null : null,
+        referencePointDescription,
         transport: formData.transport || false,
         numberOfPeople: numberOfPeopleValue,
         adultCount: adultVal,
         childCount: childVal,
         seniorCount: seniorVal,
+        infantCount: infantVal,
         passengerCount: formData.transport ? formData.passengerCount : null,
         commissionPercentage: finalCommission,
         subtotal: subtotalPersist,
@@ -721,7 +741,7 @@ export default function BookingsPage() {
         exempt: formData.exonerateTax,
         commissionAmount: commissionAmountPersist,
         customerName: formData.customerName.trim(),
-        customerEmail: formData.customerEmail?.trim() || null,
+        customerEmail: formData.customerEmail.trim().toLowerCase(),
         customerPhone: formData.customerPhone?.trim() || null,
         comment: formData.comment?.trim() || null,
         status: formData.status,
@@ -869,18 +889,114 @@ export default function BookingsPage() {
     borderBottom: "1px solid #f1f5f9",
   };
 
-  const transportCommissionGridStyle: CSSProperties = {
+  const stepIntroStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "14px 16px",
+    borderRadius: "14px",
+    border: "1px solid #dbeafe",
+    background: "linear-gradient(135deg, #f8fbff 0%, #eefcf6 100%)",
+    color: "#334155",
+    boxShadow: "0 10px 30px rgba(15, 23, 42, 0.05)",
+  };
+
+  const stepIntroIconStyle: CSSProperties = {
+    width: "40px",
+    height: "40px",
+    borderRadius: "12px",
+    background: "#0f766e",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
+
+  const stepTwoGridStyle: CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-    gap: "12px 16px",
+    gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(320px, 0.78fr)",
+    gap: "16px",
     alignItems: "start",
   };
 
-  const transportToggleStyle: CSSProperties = {
-    minHeight: "64px",
+  const bookingFormCardStyle: CSSProperties = {
+    borderRadius: "16px",
+    border: "1px solid #dbe3ef",
+    background: "#ffffff",
+    padding: "16px",
+    boxShadow: "0 14px 38px rgba(15, 23, 42, 0.06)",
+  };
+
+  const sectionHeaderStyle: CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "12px",
+    marginBottom: "14px",
+    paddingBottom: "12px",
+    borderBottom: "1px solid #e2e8f0",
+  };
+
+  const sectionEyebrowStyle: CSSProperties = {
+    display: "block",
+    marginBottom: "4px",
+    fontSize: "0.6875rem",
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "#0f766e",
+  };
+
+  const sectionTitleStyle: CSSProperties = {
+    margin: 0,
+    color: "#0f172a",
+    fontSize: "1rem",
+    fontWeight: 800,
+    lineHeight: 1.25,
+  };
+
+  const sectionHintStyle: CSSProperties = {
+    margin: "4px 0 0",
+    color: "#64748b",
+    fontSize: "0.8125rem",
+    lineHeight: 1.4,
+  };
+
+  const sectionIconStyle: CSSProperties = {
+    width: "36px",
+    height: "36px",
+    borderRadius: "10px",
+    background: "#ecfdf5",
+    color: "#0f766e",
     display: "flex",
     alignItems: "center",
-    paddingTop: formData.transport ? "22px" : "0",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
+
+  const fieldGridStyle: CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
+    gap: "12px",
+  };
+
+  const transportPanelStyle: CSSProperties = {
+    borderRadius: "14px",
+    border: formData.transport ? "1px solid #99f6e4" : "1px dashed #cbd5e1",
+    background: formData.transport
+      ? "linear-gradient(135deg, #f0fdfa 0%, #ffffff 64%)"
+      : "#f8fafc",
+    padding: "14px",
+    marginBottom: "14px",
+  };
+
+  const transportFieldsGridStyle: CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: isMobile ? "1fr" : "0.72fr 1fr",
+    gap: "12px",
+    marginTop: "12px",
+    alignItems: "start",
   };
 
   const getStatusBadge = (status: BookingStatus) => {
@@ -933,7 +1049,7 @@ export default function BookingsPage() {
       align: "center",
       hideOnMobile: true,
       accessor: (b) =>
-        `${b.adultCount ?? 0} A / ${b.childCount ?? 0} N / ${b.seniorCount ?? 0} M`,
+        `${b.adultCount ?? 0} A / ${b.childCount ?? 0} N / ${b.seniorCount ?? 0} M / ${b.infantCount ?? 0} I`,
     },
     {
       key: "companyName",
@@ -1378,6 +1494,7 @@ export default function BookingsPage() {
                           adultCountInput: "",
                           childCountInput: "",
                           seniorCountInput: "",
+                          infantCountInput: "",
                         }));
                       }}
                       options={scheduleOptions}
@@ -1456,6 +1573,9 @@ export default function BookingsPage() {
                             Mayores <strong>${formatPrice(selectedSchedule.seniorPrice)}</strong>
                           </span>
                         )}
+                        <span>
+                          Infantes <strong>$0.00</strong>
+                        </span>
                       </div>
                     )}
                   </div>
@@ -1482,8 +1602,8 @@ export default function BookingsPage() {
                     lineHeight: 1.5,
                   }}
                 >
-                  Indica el total de personas y reparte entre adultos, niños y adultos mayores. La
-                  suma debe coincidir con el total y respetar el máximo de cupos.
+                  Indica el total de personas y reparte entre adultos, niños, adultos mayores e
+                  infantes. La suma debe coincidir con el total y respetar el máximo de cupos.
                 </p>
                 <FormInput
                   label="Cantidad total"
@@ -1503,6 +1623,7 @@ export default function BookingsPage() {
                       adultCountInput: total,
                       childCountInput: 0,
                       seniorCountInput: 0,
+                      infantCountInput: 0,
                       passengerCount:
                         formData.transport &&
                         total > 0 &&
@@ -1542,7 +1663,8 @@ export default function BookingsPage() {
                         const adultCount = parseCount(v);
                         const childCount = parseCount(formData.childCountInput);
                         const seniorCount = parseCount(formData.seniorCountInput);
-                        const total = adultCount + childCount + seniorCount;
+                        const infantCount = parseCount(formData.infantCountInput);
+                        const total = adultCount + childCount + seniorCount + infantCount;
                         setFormData({
                           ...formData,
                           adultCountInput: v,
@@ -1576,7 +1698,8 @@ export default function BookingsPage() {
                         const adultCount = parseCount(formData.adultCountInput);
                         const childCount = parseCount(v);
                         const seniorCount = parseCount(formData.seniorCountInput);
-                        const total = adultCount + childCount + seniorCount;
+                        const infantCount = parseCount(formData.infantCountInput);
+                        const total = adultCount + childCount + seniorCount + infantCount;
                         setFormData({
                           ...formData,
                           childCountInput: v,
@@ -1610,7 +1733,8 @@ export default function BookingsPage() {
                         const adultCount = parseCount(formData.adultCountInput);
                         const childCount = parseCount(formData.childCountInput);
                         const seniorCount = parseCount(v);
-                        const total = adultCount + childCount + seniorCount;
+                        const infantCount = parseCount(formData.infantCountInput);
+                        const total = adultCount + childCount + seniorCount + infantCount;
                         setFormData({
                           ...formData,
                           seniorCountInput: v,
@@ -1632,6 +1756,37 @@ export default function BookingsPage() {
                           ).toFixed(2)}
                         </div>
                       )}
+                  </div>
+                  <div>
+                    <FormInput
+                      label="Infantes"
+                      type="number"
+                      min={0}
+                      value={formData.infantCountInput}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? "" : e.target.value;
+                        const adultCount = parseCount(formData.adultCountInput);
+                        const childCount = parseCount(formData.childCountInput);
+                        const seniorCount = parseCount(formData.seniorCountInput);
+                        const infantCount = parseCount(v);
+                        const total = adultCount + childCount + seniorCount + infantCount;
+                        setFormData({
+                          ...formData,
+                          infantCountInput: v,
+                          numberOfPeopleInput: total > 0 ? total : "",
+                          numberOfPeople: total,
+                        });
+                      }}
+                      fullWidth
+                      disabled={formLoading || !availabilityInfo}
+                      placeholder="0"
+                      helperText="Menores a 6 años"
+                    />
+                    {formData.infantCountInput !== "" && (
+                      <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
+                        = $0.00
+                      </div>
+                    )}
                   </div>
                 </div>
                 {selectedSchedule && (
@@ -1687,12 +1842,14 @@ export default function BookingsPage() {
                 )}
                 {(formData.adultCountInput !== "" ||
                   formData.childCountInput !== "" ||
-                  formData.seniorCountInput !== "") && (
+                  formData.seniorCountInput !== "" ||
+                  formData.infantCountInput !== "") && (
                   <div style={{ fontSize: "0.8125rem", color: "#64748b" }}>
                     Suma categorías:{" "}
                     {parseCount(formData.adultCountInput) +
                       parseCount(formData.childCountInput) +
-                      parseCount(formData.seniorCountInput)}
+                      parseCount(formData.seniorCountInput) +
+                      parseCount(formData.infantCountInput)}
                     {typeof formData.numberOfPeopleInput === "string" &&
                     formData.numberOfPeopleInput.trim() !== "" &&
                     !Number.isNaN(parseInt(formData.numberOfPeopleInput.trim(), 10))
@@ -1706,112 +1863,94 @@ export default function BookingsPage() {
             {bookingWizardStep === 2 && (
               <div
                 style={{
-                  maxWidth: "800px",
+                  maxWidth: "1120px",
                   margin: "0 auto",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "16px",
+                  gap: "18px",
                 }}
               >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "0.9375rem",
-                    color: "#475569",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Completa los datos del cliente, la forma de pago y, si aplica, transporte o
-                  comisión por compañía.
-                </p>
-
-                <div style={summarySectionStyle}>
-                  <div
-                    style={{
-                      fontSize: "0.6875rem",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      color: "#64748b",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    Cliente
+                <div style={stepIntroStyle}>
+                  <div style={stepIntroIconStyle}>
+                    <Wallet size={19} aria-hidden />
                   </div>
-                <FormInput
-                  label="Nombre"
-                  value={formData.customerName}
-                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                  required
-                  fullWidth
-                  disabled={formLoading}
-                />
-                <div
-                  style={{
-                    display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: "10px",
-                  }}
-                >
-                  <FormInput
-                    label="Email"
-                    type="email"
-                    value={formData.customerEmail || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        customerEmail: e.target.value.trim() || null,
-                      })
-                    }
-                    fullWidth
-                    disabled={formLoading}
-                    placeholder="Opcional"
-                  />
-                  <FormInput
-                    label="Teléfono"
-                    value={formData.customerPhone || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        customerPhone: e.target.value.trim() || null,
-                      })
-                    }
-                    fullWidth
-                    disabled={formLoading}
-                    placeholder="Opcional"
-                  />
-                </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, color: "#0f172a" }}>
+                      Cliente, pago y extras
+                    </div>
+                    <div style={{ marginTop: "2px", fontSize: "0.875rem", lineHeight: 1.45 }}>
+                      Completa el contacto, selecciona el tipo de pago y define transporte o
+                      comisión solo cuando aplique.
+                    </div>
+                  </div>
                 </div>
 
-                <div style={summarySectionStyle}>
-                  <div
-                    style={{
-                      fontSize: "0.6875rem",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      color: "#64748b",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    Pago y comentarios
-                  </div>
-                {(() => {
-                  const selectedPaymentType = paymentTypes.find(
-                    (p) => p.id === formData.paymentTypeId
-                  );
-                  const isCard =
-                    selectedPaymentType &&
-                    selectedPaymentType.name.toLowerCase() === "tarjeta";
-                  return (
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: isCard ? "repeat(auto-fit, minmax(220px, 1fr))" : "1fr",
-                        gap: "10px",
-                        alignItems: "start",
-                      }}
-                    >
+                <div style={stepTwoGridStyle}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
+                    <section style={bookingFormCardStyle}>
+                      <div style={sectionHeaderStyle}>
+                        <div>
+                          <span style={sectionEyebrowStyle}>Cliente</span>
+                          <h3 style={sectionTitleStyle}>Datos de contacto</h3>
+                          <p style={sectionHintStyle}>Nombre y medios para localizar al cliente.</p>
+                        </div>
+                        <div style={sectionIconStyle}>
+                          <Users size={18} aria-hidden />
+                        </div>
+                      </div>
+
+                      <FormInput
+                        label="Nombre"
+                        value={formData.customerName}
+                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                        required
+                        fullWidth
+                        disabled={formLoading}
+                      />
+                      <div style={fieldGridStyle}>
+                        <FormInput
+                          label="Email"
+                          type="email"
+                          value={formData.customerEmail || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              customerEmail: e.target.value,
+                            })
+                          }
+                          required
+                          fullWidth
+                          disabled={formLoading}
+                          placeholder="correo@ejemplo.com"
+                        />
+                        <FormInput
+                          label="Teléfono"
+                          value={formData.customerPhone || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              customerPhone: e.target.value.trim() || null,
+                            })
+                          }
+                          fullWidth
+                          disabled={formLoading}
+                          placeholder="Opcional"
+                        />
+                      </div>
+                    </section>
+
+                    <section style={bookingFormCardStyle}>
+                      <div style={sectionHeaderStyle}>
+                        <div>
+                          <span style={sectionEyebrowStyle}>Pago</span>
+                          <h3 style={sectionTitleStyle}>Cobro y observaciones</h3>
+                          <p style={sectionHintStyle}>Define el método de pago y cualquier nota interna.</p>
+                        </div>
+                        <div style={sectionIconStyle}>
+                          <Wallet size={18} aria-hidden />
+                        </div>
+                      </div>
+
                       <FormCombobox
                         label="Tipo de pago"
                         value={formData.paymentTypeId || ""}
@@ -1820,7 +1959,6 @@ export default function BookingsPage() {
                           setFormData({
                             ...formData,
                             paymentTypeId,
-                            cardTypeId: null,
                           });
                         }}
                         options={paymentTypeOptions}
@@ -1830,177 +1968,249 @@ export default function BookingsPage() {
                         fullWidth
                         disabled={formLoading}
                       />
-                      {isCard ? (
-                        <FormCombobox
-                          label="Tipo de tarjeta"
-                          value={formData.cardTypeId || ""}
-                          onChange={(value) => {
-                            const cardTypeId = value ? String(value) : null;
+                      <FormInput
+                        label="Comentario"
+                        value={formData.comment || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            comment: e.target.value,
+                          })
+                        }
+                        fullWidth
+                        disabled={formLoading}
+                        placeholder="Opcional"
+                      />
+                    </section>
+                  </div>
+
+                  <aside style={{ ...bookingFormCardStyle, minWidth: 0 }}>
+                    <div style={sectionHeaderStyle}>
+                      <div>
+                        <span style={sectionEyebrowStyle}>Extras</span>
+                        <h3 style={sectionTitleStyle}>Transporte y comisión</h3>
+                        <p style={sectionHintStyle}>Configura recogida, referencia y compañía asociada.</p>
+                      </div>
+                      <div style={sectionIconStyle}>
+                        <ClipboardCheck size={18} aria-hidden />
+                      </div>
+                    </div>
+
+                    <div style={transportPanelStyle}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          gap: "12px",
+                        }}
+                      >
+                        <FormCheckbox
+                          label="Requiere transporte"
+                          checked={formData.transport || false}
+                          onChange={(e) => {
+                            const needsTransport = e.target.checked;
+                            if (!needsTransport) setUseManualReferencePoint(false);
                             setFormData({
                               ...formData,
-                              cardTypeId,
+                              transport: needsTransport,
+                              referencePointId: needsTransport ? formData.referencePointId : null,
+                              referencePointDescription: needsTransport
+                                ? formData.referencePointDescription
+                                : null,
+                              passengerCount: needsTransport
+                                ? formData.passengerCount ||
+                                  (() => {
+                                    const numValue =
+                                      typeof formData.numberOfPeopleInput === "string"
+                                        ? parseInt(formData.numberOfPeopleInput.trim(), 10)
+                                        : formData.numberOfPeopleInput;
+                                    return Number.isFinite(numValue) && numValue > 0 ? numValue : null;
+                                  })()
+                                : null,
                             });
                           }}
-                          options={cardTypeOptions}
-                          placeholder="Selecciona tarjeta"
-                          searchPlaceholder="Buscar..."
-                          required
-                          fullWidth
                           disabled={formLoading}
                         />
-                      ) : null}
-                    </div>
-                  );
-                })()}
-                <FormInput
-                  label="Comentario"
-                  value={formData.comment || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      comment: e.target.value,
-                    })
-                  }
-                  fullWidth
-                  disabled={formLoading}
-                  placeholder="Opcional"
-                />
-                </div>
+                        <span
+                          style={{
+                            ...badgeStyles.base,
+                            ...(formData.transport ? badgeStyles.success : badgeStyles.info),
+                            flexShrink: 0,
+                            marginTop: "2px",
+                          }}
+                        >
+                          {formData.transport ? "Activo" : "Opcional"}
+                        </span>
+                      </div>
 
-                <div style={summarySectionStyle}>
-                  <div
-                    style={{
-                      fontSize: "0.6875rem",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      color: "#64748b",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    Transporte y comisión
-                  </div>
-                <div style={transportCommissionGridStyle}>
-                  <div style={transportToggleStyle}>
-                    <FormCheckbox
-                      label="Requiere transporte"
-                      checked={formData.transport || false}
-                      onChange={(e) => {
-                        const needsTransport = e.target.checked;
-                        setFormData({
-                          ...formData,
-                          transport: needsTransport,
-                          referencePointId: needsTransport ? formData.referencePointId : null,
-                          passengerCount: needsTransport
-                            ? formData.passengerCount ||
-                              (() => {
-                                const numValue =
-                                  typeof formData.numberOfPeopleInput === "string"
-                                    ? parseInt(formData.numberOfPeopleInput.trim(), 10)
-                                    : formData.numberOfPeopleInput;
-                                return Number.isFinite(numValue) && numValue > 0 ? numValue : null;
-                              })()
-                            : null,
-                        });
-                      }}
-                      disabled={formLoading}
-                    />
-                  </div>
-                  {formData.transport && (
-                    <>
-                      <div style={{ minWidth: 0 }}>
+                      {formData.transport ? (
+                        <div style={transportFieldsGridStyle}>
+                          <FormInput
+                            label="Pasajeros"
+                            type="number"
+                            min={1}
+                            value={
+                              formData.passengerCount !== null && formData.passengerCount !== undefined
+                                ? formData.passengerCount
+                                : ""
+                            }
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFormData({
+                                ...formData,
+                                passengerCount: value !== "" ? parseInt(value, 10) : null,
+                              });
+                            }}
+                            required
+                            fullWidth
+                            disabled={formLoading}
+                            placeholder="Nº"
+                            helperText="Por defecto coincide con el total."
+                          />
+
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                padding: "10px 12px",
+                                borderRadius: "12px",
+                                border: "1px solid #e2e8f0",
+                                background: "#ffffff",
+                                marginBottom: "12px",
+                              }}
+                            >
+                              <FormCheckbox
+                                label="Digitar referencia manual"
+                                checked={useManualReferencePoint}
+                                onChange={(e) => {
+                                  const manual = e.target.checked;
+                                  setUseManualReferencePoint(manual);
+                                  setFormData({
+                                    ...formData,
+                                    referencePointId: manual ? null : formData.referencePointId,
+                                    referencePointDescription: manual
+                                      ? formData.referencePointDescription ?? ""
+                                      : referencePoints.find(
+                                          (point) => point.id === formData.referencePointId
+                                        )?.description ?? null,
+                                  });
+                                }}
+                                disabled={formLoading}
+                                helperText="Si no existe en catálogo, escribe la referencia."
+                              />
+                            </div>
+
+                            {useManualReferencePoint ? (
+                              <FormInput
+                                label="Punto de referencia"
+                                value={formData.referencePointDescription || ""}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    referencePointId: null,
+                                    referencePointDescription: e.target.value,
+                                  })
+                                }
+                                required
+                                fullWidth
+                                disabled={formLoading}
+                                placeholder="Ej. Hotel, entrada principal"
+                              />
+                            ) : (
+                              <FormCombobox
+                                label="Punto de referencia"
+                                value={formData.referencePointId || ""}
+                                onChange={(value) => {
+                                  const referencePointId = value ? String(value) : null;
+                                  setFormData({
+                                    ...formData,
+                                    referencePointId,
+                                    referencePointDescription:
+                                      referencePoints.find((point) => point.id === referencePointId)
+                                        ?.description ?? null,
+                                  });
+                                }}
+                                options={referencePointOptions}
+                                placeholder="Selecciona un punto"
+                                searchPlaceholder="Buscar punto..."
+                                required
+                                fullWidth
+                                disabled={formLoading || catalogsLoading}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            marginTop: "4px",
+                            padding: "10px 12px",
+                            borderRadius: "10px",
+                            background: "#ffffff",
+                            color: "#64748b",
+                            fontSize: "0.8125rem",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          Activa transporte para agregar pasajeros y punto de referencia.
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div style={{ marginBottom: "10px" }}>
+                        <span style={sectionEyebrowStyle}>Compañía</span>
+                        <p style={sectionHintStyle}>Opcional. Aplica comisión asociada a socios.</p>
+                      </div>
+                      <FormCombobox
+                        label="Compañía"
+                        value={formData.companyId || ""}
+                        onChange={(value) => {
+                          const companyId = value ? String(value) : null;
+                          setFormData({
+                            ...formData,
+                            companyId,
+                            commissionPercentage: companyId
+                              ? companies.find((c) => c.id === companyId)?.commissionPercentage
+                              : undefined,
+                          });
+                        }}
+                        options={companyOptions}
+                        placeholder="Ninguna"
+                        searchPlaceholder="Buscar compañía..."
+                        fullWidth
+                        disabled={formLoading}
+                      />
+                      {formData.companyId && (
                         <FormInput
-                          label="Pasajeros"
+                          label="Comisión (%)"
                           type="number"
-                          min={1}
+                          min={0}
+                          max={100}
+                          step="0.1"
                           value={
-                            formData.passengerCount !== null && formData.passengerCount !== undefined
-                              ? formData.passengerCount
-                              : ""
+                            formData.commissionPercentage !== undefined &&
+                            formData.commissionPercentage !== null
+                              ? formData.commissionPercentage
+                              : companies.find((c) => c.id === formData.companyId)
+                                  ?.commissionPercentage ?? ""
                           }
                           onChange={(e) => {
                             const value = e.target.value;
                             setFormData({
                               ...formData,
-                              passengerCount: value !== "" ? parseInt(value, 10) : null,
+                              commissionPercentage: value !== "" ? parseFloat(value) : undefined,
                             });
                           }}
                           required
                           fullWidth
                           disabled={formLoading}
-                          placeholder="Nº"
-                          helperText="Por defecto coincide con el total de personas."
+                          placeholder={`Def. ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}%`}
+                          helperText="Puedes sobrescribir el % de la compañía."
                         />
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <FormCombobox
-                          label="Punto de referencia"
-                          value={formData.referencePointId || ""}
-                          onChange={(value) =>
-                            setFormData({
-                              ...formData,
-                              referencePointId: value ? String(value) : null,
-                            })
-                          }
-                          options={referencePointOptions}
-                          placeholder="Selecciona un punto"
-                          searchPlaceholder="Buscar punto..."
-                          required
-                          fullWidth
-                          disabled={formLoading || catalogsLoading}
-                        />
-                      </div>
-                    </>
-                  )}
-                  {!formData.transport && <div />}
-                </div>
-                <FormCombobox
-                  label="Compañía"
-                  value={formData.companyId || ""}
-                  onChange={(value) => {
-                    const companyId = value ? String(value) : null;
-                    setFormData({
-                      ...formData,
-                      companyId,
-                      commissionPercentage: companyId
-                        ? companies.find((c) => c.id === companyId)?.commissionPercentage
-                        : undefined,
-                    });
-                  }}
-                  options={companyOptions}
-                  placeholder="Ninguna"
-                  searchPlaceholder="Buscar compañía..."
-                  fullWidth
-                  disabled={formLoading}
-                />
-                {formData.companyId && (
-                  <FormInput
-                    label="Comisión (%)"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="0.1"
-                    value={
-                      formData.commissionPercentage !== undefined &&
-                      formData.commissionPercentage !== null
-                        ? formData.commissionPercentage
-                        : companies.find((c) => c.id === formData.companyId)
-                            ?.commissionPercentage ?? ""
-                    }
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({
-                        ...formData,
-                        commissionPercentage: value !== "" ? parseFloat(value) : undefined,
-                      });
-                    }}
-                    required
-                    fullWidth
-                    disabled={formLoading}
-                    placeholder={`Def. ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}%`}
-                    helperText="Puedes sobrescribir el % de la compañía."
-                  />
-                )}
+                      )}
+                    </div>
+                  </aside>
                 </div>
               </div>
             )}
@@ -2177,14 +2387,6 @@ export default function BookingsPage() {
                       <span style={{ color: "#64748b" }}>Pago</span>
                       <span style={{ textAlign: "right" }}>
                         {paymentTypes.find((p) => p.id === formData.paymentTypeId)?.name ?? "—"}
-                        {(() => {
-                          const pt = paymentTypes.find((p) => p.id === formData.paymentTypeId);
-                          const isCard =
-                            pt && pt.name.toLowerCase() === "tarjeta" && formData.cardTypeId;
-                          if (!isCard) return null;
-                          const cn = cardTypes.find((c) => c.id === formData.cardTypeId)?.name;
-                          return cn ? ` · ${cn}` : "";
-                        })()}
                       </span>
                     </div>
                     <div style={{ ...summaryRowStyle, borderBottom: "none" }}>

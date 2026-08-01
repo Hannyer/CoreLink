@@ -49,7 +49,6 @@ const EMPTY_FORM: UserFormData = {
   roleId: "",
   languageIds: [],
   licenses: [],
-  speaksEnglish: false,
   status: true,
 };
 
@@ -135,11 +134,11 @@ export default function UsersPage() {
     selectedRole?.requiresLicense ??
     editingUser?.roleRequiresLicense ??
     formData.roleId === ROLE_ID_CONDUCTOR;
-  const requiresLanguages =
+  const roleRequiresLanguages =
     selectedRole?.requiresLanguages ??
     editingUser?.roleRequiresLanguages ??
     formData.roleId === ROLE_ID_GUIA;
-  const requiresLicenses = requiresLicense || requiresLanguages;
+  const requiresLicenses = requiresLicense || roleRequiresLanguages;
 
   const loadLanguages = async () => {
     try {
@@ -213,7 +212,6 @@ export default function UsersPage() {
       roleId: user.roleId,
       languageIds: user.languages?.map((l) => l.id) ?? [],
       licenses: user.licenses ?? [],
-      speaksEnglish: user.speaksEnglish,
       status: user.status,
     });
     setShowPassword(false);
@@ -277,6 +275,10 @@ export default function UsersPage() {
       toast.error("El rol es requerido");
       return;
     }
+    if (!formData.languageIds || formData.languageIds.length === 0) {
+      toast.error("Debe seleccionar al menos un idioma");
+      return;
+    }
     if (requiresLicenses && (!formData.licenses || formData.licenses.length === 0)) {
       toast.error("Debe seleccionar al menos una licencia para el rol Guía o Conductor");
       return;
@@ -285,11 +287,6 @@ export default function UsersPage() {
       toast.error("Todas las licencias seleccionadas deben tener fecha de vencimiento");
       return;
     }
-    if (requiresLanguages && (!formData.languageIds || formData.languageIds.length === 0)) {
-      toast.error("Debe seleccionar al menos un idioma para el rol Guía");
-      return;
-    }
-
     try {
       setFormLoading(true);
 
@@ -301,13 +298,10 @@ export default function UsersPage() {
           fullName: formData.fullName,
           phone: formData.phone,
           roleId: formData.roleId,
-          speaksEnglish: formData.speaksEnglish,
+          languageIds: formData.languageIds ?? [],
           status: formData.status,
         };
 
-        if (requiresLanguages) {
-          payload.languageIds = formData.languageIds ?? [];
-        }
         if (requiresLicenses) {
           payload.licenses = formData.licenses ?? [];
         } else {
@@ -362,23 +356,6 @@ export default function UsersPage() {
       header: "Rol",
       width: "150px",
       accessor: (u) => u.roleName ?? "—",
-    },
-    {
-      key: "speaksEnglish",
-      header: "Inglés",
-      width: "90px",
-      align: "center",
-      hideOnMobile: true,
-      render: (u) => (
-        <span
-          style={{
-            ...badgeStyles.base,
-            ...(u.speaksEnglish ? badgeStyles.info : badgeStyles.secondary),
-          }}
-        >
-          {u.speaksEnglish ? "Sí" : "No"}
-        </span>
-      ),
     },
     {
       key: "status",
@@ -657,20 +634,17 @@ export default function UsersPage() {
               const nextRole = roleOptions.find((r) => r.value === nextRoleId);
               const nextRequiresLicense =
                 nextRole?.requiresLicense ?? nextRoleId === ROLE_ID_CONDUCTOR;
-              const nextRequiresLanguages =
+              const nextRoleRequiresLanguages =
                 nextRole?.requiresLanguages ?? nextRoleId === ROLE_ID_GUIA;
+              const nextRequiresLicenses = nextRequiresLicense || nextRoleRequiresLanguages;
 
               setFormData({
                 ...formData,
                 roleId: nextRoleId,
-                ...(!(nextRequiresLicense || nextRequiresLanguages) ? { licenses: [] } : {}),
-                ...(!nextRequiresLanguages ? { languageIds: [] } : {}),
+                ...(!nextRequiresLicenses ? { licenses: [] } : {}),
               });
 
-              if (nextRequiresLanguages && languages.length === 0) {
-                void loadLanguages();
-              }
-              if ((nextRequiresLicense || nextRequiresLanguages) && licenseTypes.length === 0) {
+              if (nextRequiresLicenses && licenseTypes.length === 0) {
                 void loadLicenseTypes();
               }
             }}
@@ -777,76 +751,66 @@ export default function UsersPage() {
             </div>
           )}
 
-          {requiresLanguages && (
-            <div style={{ marginTop: "8px", marginBottom: "8px" }}>
-              <label
+          <div style={{ marginTop: "8px", marginBottom: "8px" }}>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: "#1e293b",
+              }}
+            >
+              Idiomas <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            {loadingLanguages ? (
+              <div style={{ color: "#64748b", fontSize: "0.875rem" }}>
+                Cargando idiomas...
+              </div>
+            ) : languages.length === 0 ? (
+              <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>
+                No hay idiomas disponibles
+              </div>
+            ) : (
+              <div
                 style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#1e293b",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  padding: "12px",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  borderRadius: "8px",
+                  backgroundColor: formLoading ? "#f1f5f9" : "#ffffff",
+                  maxHeight: "200px",
+                  overflowY: "auto",
                 }}
               >
-                Idiomas <span style={{ color: "#ef4444" }}>*</span>
-              </label>
-              {loadingLanguages ? (
-                <div style={{ color: "#64748b", fontSize: "0.875rem" }}>
-                  Cargando idiomas...
-                </div>
-              ) : languages.length === 0 ? (
-                <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>
-                  No hay idiomas disponibles
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                    padding: "12px",
-                    border: "1px solid rgba(0,0,0,0.15)",
-                    borderRadius: "8px",
-                    backgroundColor: formLoading ? "#f1f5f9" : "#ffffff",
-                    maxHeight: "200px",
-                    overflowY: "auto",
-                  }}
-                >
-                  {languages.map((language) => (
-                    <FormCheckbox
-                      key={language.id}
-                      label={`${language.name} (${language.code})`}
-                      checked={(formData.languageIds ?? []).includes(language.id)}
-                      onChange={() => handleLanguageToggle(language.id)}
-                      disabled={formLoading}
-                    />
-                  ))}
-                </div>
-              )}
-              {(!formData.languageIds || formData.languageIds.length === 0) && (
-                <div
-                  style={{
-                    marginTop: "6px",
-                    fontSize: "0.875rem",
-                    color: "#ef4444",
-                  }}
-                >
-                  Obligatorio para el rol Guía: seleccione al menos un idioma
-                </div>
-              )}
-            </div>
-          )}
+                {languages.map((language) => (
+                  <FormCheckbox
+                    key={language.id}
+                    label={`${language.name} (${language.code})`}
+                    checked={(formData.languageIds ?? []).includes(language.id)}
+                    onChange={() => handleLanguageToggle(language.id)}
+                    disabled={formLoading}
+                  />
+                ))}
+              </div>
+            )}
+            {(!formData.languageIds || formData.languageIds.length === 0) && (
+              <div
+                style={{
+                  marginTop: "6px",
+                  fontSize: "0.875rem",
+                  color: "#ef4444",
+                }}
+              >
+                Obligatorio: seleccione al menos un idioma
+              </div>
+            )}
+          </div>
 
           {/* Checkboxes */}
           <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
-            <FormCheckbox
-              label="Habla inglés"
-              checked={formData.speaksEnglish ?? false}
-              onChange={(e) =>
-                setFormData({ ...formData, speaksEnglish: e.target.checked })
-              }
-              disabled={formLoading}
-            />
             <FormCheckbox
               label="Activo"
               checked={formData.status ?? true}

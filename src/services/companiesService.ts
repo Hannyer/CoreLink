@@ -13,6 +13,8 @@ function mapApiCompanyToCompany(apiCompany: any): Company {
   return {
     id: apiCompany.id,
     name: apiCompany.name,
+    email: apiCompany.email ?? "",
+    phone: apiCompany.phone ?? "",
     commissionPercentage: apiCompany.commissionPercentage ?? apiCompany.commission_percentage ?? 0,
     status: apiCompany.status ?? true,
     createdAt: apiCompany.createdAt || apiCompany.created_at,
@@ -70,6 +72,8 @@ export async function getCompany(id: string): Promise<Company> {
 export async function createCompany(payload: CompanyFormData): Promise<Company> {
   const apiPayload = {
     name: payload.name,
+    email: payload.email,
+    phone: payload.phone,
     commissionPercentage: payload.commissionPercentage,
     status: payload.status ?? true,
   };
@@ -85,6 +89,8 @@ export async function updateCompany(id: string, payload: Partial<CompanyFormData
   const apiPayload: any = {};
 
   if (payload.name !== undefined) apiPayload.name = payload.name;
+  if (payload.email !== undefined) apiPayload.email = payload.email;
+  if (payload.phone !== undefined) apiPayload.phone = payload.phone;
   if (payload.commissionPercentage !== undefined) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.status !== undefined) apiPayload.status = payload.status;
 

@@ -118,7 +118,6 @@ export async function createUser(payload: UserFormData): Promise<User> {
     phone: payload.phone.trim(),
     password: payload.password,
     roleId: payload.roleId,
-    speaksEnglish: payload.speaksEnglish ?? false,
     status: payload.status ?? true,
   };
 
@@ -147,8 +146,6 @@ export async function updateUser(
     body.password = payload.password;
   }
   if (payload.roleId !== undefined) body.roleId = payload.roleId;
-  if (payload.speaksEnglish !== undefined)
-    body.speaksEnglish = payload.speaksEnglish;
   if (payload.status !== undefined) body.status = payload.status;
   if (payload.languageIds !== undefined) {
     body.languageIds = payload.languageIds;

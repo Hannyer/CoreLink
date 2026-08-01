@@ -45,6 +45,7 @@ function mapApiBookingToBooking(apiBooking: any): Booking {
     adultCount: apiBooking.adultCount ?? apiBooking.adult_count ?? 0,
     childCount: apiBooking.childCount ?? apiBooking.child_count ?? 0,
     seniorCount: apiBooking.seniorCount ?? apiBooking.senior_count ?? 0,
+    infantCount: apiBooking.infantCount ?? apiBooking.infant_count ?? 0,
     passengerCount: apiBooking.passengerCount !== undefined ? apiBooking.passengerCount : (apiBooking.passenger_count !== undefined ? apiBooking.passenger_count : null),
     commissionPercentage: apiBooking.commissionPercentage ?? apiBooking.commission_percentage ?? 0,
     subtotal: apiBooking.subtotal != null && apiBooking.subtotal !== "" ? Number(apiBooking.subtotal) : null,
@@ -186,15 +187,18 @@ export async function createBooking(payload: BookingFormData): Promise<Booking> 
     adultCount: payload.adultCount ?? 0,
     childCount: payload.childCount ?? 0,
     seniorCount: payload.seniorCount ?? 0,
+    infantCount: payload.infantCount ?? 0,
     customerName: payload.customerName,
     transport: payload.transport ?? false,
     status: payload.status ?? "pending",
   };
 
   if (payload.companyId != null) apiPayload.companyId = payload.companyId;
-  if (payload.cardTypeId != null) apiPayload.cardTypeId = payload.cardTypeId;
   if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
-  if (payload.transport && payload.referencePointId != null) apiPayload.referencePointId = payload.referencePointId;
+  if (payload.transport) {
+    apiPayload.referencePointId = payload.referencePointId ?? null;
+    apiPayload.referencePointDescription = payload.referencePointDescription?.trim() || null;
+  }
   if (payload.commissionPercentage != null) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.subtotal !== undefined) apiPayload.subtotal = payload.subtotal;
   if (payload.vatAmount !== undefined) apiPayload.vatAmount = payload.vatAmount;
@@ -218,18 +222,22 @@ export async function updateBooking(id: string, payload: Partial<BookingFormData
   if (payload.activityScheduleId !== undefined) apiPayload.activityScheduleId = payload.activityScheduleId;
   if (payload.companyId !== undefined) apiPayload.companyId = payload.companyId;
   if (payload.paymentTypeId !== undefined) apiPayload.paymentTypeId = payload.paymentTypeId;
-  if (payload.cardTypeId !== undefined) apiPayload.cardTypeId = payload.cardTypeId;
   if (payload.transport !== undefined) apiPayload.transport = payload.transport;
   if (payload.transport && payload.passengerCount != null) apiPayload.passengerCount = payload.passengerCount;
-  if (payload.transport && payload.referencePointId != null) apiPayload.referencePointId = payload.referencePointId;
+  if (payload.transport) {
+    apiPayload.referencePointId = payload.referencePointId ?? null;
+    apiPayload.referencePointDescription = payload.referencePointDescription?.trim() || null;
+  }
   else if (payload.transport === false) {
     apiPayload.passengerCount = null;
     apiPayload.referencePointId = null;
+    apiPayload.referencePointDescription = null;
   }
   if (payload.numberOfPeople !== undefined) apiPayload.numberOfPeople = payload.numberOfPeople;
   if (payload.adultCount !== undefined) apiPayload.adultCount = payload.adultCount;
   if (payload.childCount !== undefined) apiPayload.childCount = payload.childCount;
   if (payload.seniorCount !== undefined) apiPayload.seniorCount = payload.seniorCount;
+  if (payload.infantCount !== undefined) apiPayload.infantCount = payload.infantCount;
   if (payload.commissionPercentage !== undefined) apiPayload.commissionPercentage = payload.commissionPercentage;
   if (payload.subtotal !== undefined) apiPayload.subtotal = payload.subtotal;
   if (payload.vatAmount !== undefined) apiPayload.vatAmount = payload.vatAmount;

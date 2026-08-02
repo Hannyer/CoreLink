@@ -10,8 +10,6 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { FormInput } from "@/components/form/FormInput";
-import { FormCombobox, type SelectOption } from "@/components/form/FormCombobox";
-import { getActivityTypes } from "@/services/activityTypeService";
 import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useToastContext } from "@/contexts/ToastContext";
@@ -51,9 +49,6 @@ export default function ActivitiesManagementPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  // Estado para tipos de actividad
-  const [activityTypes, setActivityTypes] = useState<SelectOption[]>([]);
-
   const [formData, setFormData] = useState<
     ActivityFormData & {
       partySizeInput: string | number;
@@ -62,7 +57,6 @@ export default function ActivitiesManagementPage() {
       seniorPriceInput: string | number;
     }
   >({
-    activityTypeId: "",
     title: "",
     partySize: 0,
     partySizeInput: "",
@@ -77,18 +71,7 @@ export default function ActivitiesManagementPage() {
 
   useEffect(() => {
     loadActivities();
-    loadActivityTypes();
   }, [page, pageSize]);
-
-  const loadActivityTypes = async () => {
-    try {
-      const types = await getActivityTypes();
-      setActivityTypes(types.map((t) => ({ value: t.id, label: t.name })));
-    } catch (error) {
-      console.error("Error al cargar tipos de actividad:", error);
-      toast.error(getErrorMessage(error));
-    }
-  };
 
   const loadActivities = async () => {
     try {
@@ -108,7 +91,6 @@ export default function ActivitiesManagementPage() {
   const handleCreateActivity = () => {
     setEditingActivity(null);
     setFormData({
-      activityTypeId: "",
       title: "",
       partySize: 0,
       partySizeInput: "",
@@ -126,7 +108,6 @@ export default function ActivitiesManagementPage() {
   const handleEditActivity = (activity: Activity) => {
     setEditingActivity(activity);
     setFormData({
-      activityTypeId: activity.activityTypeId,
       title: activity.title,
       partySize: activity.partySize,
       partySizeInput: activity.partySize,
@@ -186,11 +167,6 @@ export default function ActivitiesManagementPage() {
       return;
     }
 
-    if (!formData.activityTypeId) {
-      toast.error("El tipo de actividad es requerido");
-      return;
-    }
-
     const partySizeVal = parseNum(formData.partySizeInput);
     if (partySizeVal === null || partySizeVal <= 0) {
       toast.error("El tamaño del grupo es requerido y debe ser mayor a 0");
@@ -219,7 +195,6 @@ export default function ActivitiesManagementPage() {
       setFormLoading(true);
 
       const payload: ActivityFormData = {
-        activityTypeId: formData.activityTypeId,
         title: formData.title.trim(),
         partySize: partySizeVal,
         adultPrice: adultPriceVal,
@@ -251,11 +226,6 @@ export default function ActivitiesManagementPage() {
 
   const columns: Column<Activity>[] = [
     { key: "title", header: "Título", accessor: (a) => a.title },
-    {
-      key: "activityType",
-      header: "Tipo",
-      accessor: (a) => a.activityTypeName || "-",
-    },
     {
       key: "partySize",
       header: "Tamaño del Grupo",
@@ -375,18 +345,6 @@ export default function ActivitiesManagementPage() {
         showCloseButton={!formLoading}
       >
         <form onSubmit={handleSubmitActivity}>
-          <FormCombobox
-            label="Tipo de Actividad"
-            value={formData.activityTypeId}
-            onChange={(value) => setFormData({ ...formData, activityTypeId: String(value) })}
-            options={activityTypes}
-            required
-            fullWidth
-            disabled={formLoading}
-            placeholder="Seleccionar tipo"
-            searchPlaceholder="Buscar tipo de actividad..."
-          />
-
           <FormInput
             label="Título"
             value={formData.title}

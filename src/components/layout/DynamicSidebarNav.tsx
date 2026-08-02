@@ -25,6 +25,12 @@ const HOME_ITEM: DynamicMenuItem = {
   canDelete: false,
 };
 
+const HIDDEN_MENU_CODES = new Set(["activity-types"]);
+
+function isVisibleMenuItem(item: DynamicMenuItem) {
+  return !HIDDEN_MENU_CODES.has(item.code);
+}
+
 interface DynamicSidebarNavProps {
   collapsed: boolean;
   isMobile: boolean;
@@ -85,13 +91,21 @@ export default function DynamicSidebarNav({
       .catch((e) => console.warn("Menú dinámico no disponible:", e));
   }, [menuData?.roleId, menuData?.items?.length]);
 
+  const visibleItems = menuData?.items?.filter(isVisibleMenuItem) ?? [];
   const unsectioned = [
     HOME_ITEM,
-    ...(menuData?.unsectioned ?? []).filter((item) => item.routePath !== "/home"),
+    ...(menuData?.unsectioned ?? []).filter((item) => item.routePath !== "/home" && isVisibleMenuItem(item)),
   ];
-  const sections = menuData?.sections ?? {};
+  const sections = Object.entries(menuData?.sections ?? {}).reduce<Record<string, DynamicMenuItem[]>>(
+    (acc, [sectionName, items]) => {
+      const sectionItems = items.filter(isVisibleMenuItem);
+      if (sectionItems.length) acc[sectionName] = sectionItems;
+      return acc;
+    },
+    {}
+  );
 
-  if (!menuData?.items?.length) {
+  if (!visibleItems.length) {
     return (
       <ul className="nav flex-column gap-1">
         <NavItem

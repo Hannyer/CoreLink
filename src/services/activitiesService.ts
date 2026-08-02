@@ -111,8 +111,8 @@ export async function createActivity(
   payload: ActivityCreateRequest
 ): Promise<ActivityCreateResponse> {
   // Validar campos requeridos
-  if (!payload.activityTypeId || !payload.title) {
-    throw new Error('activityTypeId, title son requeridos');
+  if (!payload.title) {
+    throw new Error('title es requerido');
   }
 
   try {

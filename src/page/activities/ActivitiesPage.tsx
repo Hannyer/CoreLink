@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { TableCard, badgeStyles, type Column } from "@/components/ui/TableCard";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FormInput } from "@/components/form/FormInput";
-import { type SelectOption } from "@/components/form/FormSelect";
-import { FormCombobox } from "@/components/form/FormCombobox";
 import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useToastContext } from "@/contexts/ToastContext";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -17,7 +15,6 @@ import {
   updateActivity as updateScheduledActivity,
   deleteActivity as deleteScheduledActivity,
 } from "@/services/activitiesService";
-import { getActivityTypes } from "@/services/activityTypeService";
 import type {
   ActivityByDate,
   ActivityCreateRequest,
@@ -31,7 +28,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 type ActivityRow = ActivityListItem;
 
 type ActivityFormState = {
-  activityTypeId: string;
   title: string;
   partySize: number;
   partySizeInput: string | number;
@@ -42,7 +38,6 @@ type ActivityFormState = {
 };
 
 const DEFAULT_FORM_STATE: ActivityFormState = {
-  activityTypeId: "",
   title: "",
   partySize: 1,
   partySizeInput: "",
@@ -107,45 +102,10 @@ export default function ActivitiesPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [currentActivityId, setCurrentActivityId] = useState<string | null>(null);
 
-  const [activityTypes, setActivityTypes] = useState<Array<{ id: string; name: string }>>([]);
-  const [catalogsLoading, setCatalogsLoading] = useState(false);
-
-
-  const activityTypeOptions: SelectOption[] = useMemo(
-    () =>
-      Array.isArray(activityTypes)
-        ? activityTypes.map((type) => ({
-            value: type.id,
-            label: type.name || "",
-          }))
-        : [],
-    [activityTypes]
-  );
-
-  useEffect(() => {
-    loadCatalogs();
-  }, []);
-
   useEffect(() => {
     loadActivities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, dateFilter]);
-
-  async function loadCatalogs() {
-    try {
-      setCatalogsLoading(true);
-      const types = await getActivityTypes();
-      // Asegurar que siempre sean arrays
-      setActivityTypes(Array.isArray(types) ? types.map(t => ({ id: t.id, name: t.name })) : []);
-    } catch (err) {
-      console.error("Error al cargar catálogos:", err);
-      toast.error(getErrorMessage(err));
-      // En caso de error, establecer arrays vacíos
-      setActivityTypes([]);
-    } finally {
-      setCatalogsLoading(false);
-    }
-  }
 
   async function loadActivities() {
     try {
@@ -175,10 +135,7 @@ export default function ActivitiesPage() {
   }
 
   function resetFormState() {
-    setFormState({
-      ...DEFAULT_FORM_STATE,
-      activityTypeId: activityTypeOptions.length === 1 ? String(activityTypeOptions[0].value) : "",
-    });
+    setFormState(DEFAULT_FORM_STATE);
     setCurrentActivityId(null);
   }
 
@@ -197,7 +154,6 @@ export default function ActivitiesPage() {
       const data = await getScheduledActivityById(id);
       setCurrentActivityId(id);
       setFormState({
-        activityTypeId: data.activityTypeId,
         title: data.title,
         partySize: data.partySize,
         partySizeInput: data.partySize,
@@ -251,11 +207,6 @@ export default function ActivitiesPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!formState.activityTypeId) {
-      toast.error("Debes seleccionar el tipo de actividad");
-      return;
-    }
-
     if (!formState.title.trim()) {
       toast.error("El título es requerido");
       return;
@@ -304,7 +255,6 @@ export default function ActivitiesPage() {
     try {
       if (isEditing && currentActivityId) {
         const updatePayload: ActivityUpdateRequest = {
-          activityTypeId: formState.activityTypeId,
           title: formState.title.trim(),
           partySize: partySizeValue,
           adultPrice: adultPriceVal,
@@ -317,7 +267,6 @@ export default function ActivitiesPage() {
         toast.success("Actividad actualizada correctamente");
       } else {
         const createPayload: ActivityCreateRequest = {
-          activityTypeId: formState.activityTypeId,
           title: formState.title.trim(),
           partySize: partySizeValue,
           adultPrice: adultPriceVal,
@@ -350,7 +299,6 @@ export default function ActivitiesPage() {
       render: (row) => (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           <span style={{ fontWeight: 600 }}>{row.title}</span>
-          <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>{row.activityTypeName ?? "Sin tipo"}</span>
         </div>
       ),
     },
@@ -510,18 +458,6 @@ export default function ActivitiesPage() {
         ) : (
           <form onSubmit={handleSubmit}>
             <div style={{ display: "grid", gap: "16px" }}>
-              <FormCombobox
-                label="Tipo de actividad"
-                value={formState.activityTypeId}
-                onChange={(value) => setFormState((prev) => ({ ...prev, activityTypeId: String(value) }))}
-                options={activityTypeOptions}
-                placeholder={catalogsLoading ? "Cargando…" : "Selecciona un tipo"}
-                searchPlaceholder="Buscar tipo de actividad..."
-                required
-                fullWidth
-                disabled={catalogsLoading || activityTypeOptions.length === 0}
-              />
-
               <FormInput
                 label="Título"
                 value={formState.title}

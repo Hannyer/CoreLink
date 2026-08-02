@@ -18,7 +18,7 @@ import type {
 function mapApiActivityToActivity(apiActivity: any): Activity {
   return {
     id: apiActivity.id,
-    activityTypeId: apiActivity.activityTypeId || apiActivity.activity_type_id,
+    activityTypeId: apiActivity.activityTypeId ?? apiActivity.activity_type_id ?? null,
     title: apiActivity.title,
     partySize: apiActivity.partySize ?? apiActivity.party_size ?? 0,
     adultPrice: apiActivity.adultPrice ?? apiActivity.adult_price ?? 0,
@@ -98,8 +98,7 @@ export async function getActivity(id: string): Promise<Activity> {
  * Crea una nueva actividad (endpoint POST /api/activities)
  */
 export async function createActivity(payload: ActivityFormData): Promise<Activity> {
-  const apiPayload = {
-    activityTypeId: payload.activityTypeId,
+  const apiPayload: any = {
     title: payload.title,
     partySize: payload.partySize,
     adultPrice: payload.adultPrice,
@@ -107,6 +106,7 @@ export async function createActivity(payload: ActivityFormData): Promise<Activit
     seniorPrice: payload.seniorPrice,
     status: payload.status ?? true,
   };
+  if (payload.activityTypeId) apiPayload.activityTypeId = payload.activityTypeId;
 
   const { data } = await api.post<any>("/api/activities", apiPayload);
   return mapApiActivityToActivity(data);

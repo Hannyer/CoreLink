@@ -54,7 +54,7 @@ export interface Reservation {
 // ============================================
 export interface Activity {
   id: string;
-  activityTypeId: string;
+  activityTypeId: string | null;
   title: string;
   partySize: number;
   adultPrice: number;
@@ -292,7 +292,7 @@ export interface ReservationFormData {
 }
 
 export interface ActivityFormData {
-  activityTypeId: string;
+  activityTypeId?: string | null;
   title: string;
   partySize: number;
   adultPrice: number;
@@ -521,7 +521,7 @@ export interface TransportFormData {
 // ============================================
 export interface ActivityScheduled {
   id: string;
-  activityTypeId: string;
+  activityTypeId: string | null;
   activityTypeName?: string;
   title: string;
   partySize: number;
@@ -548,7 +548,7 @@ export interface ActivityAssignment {
 
 export interface ActivityListItem {
   id: string;
-  activityTypeId: string;
+  activityTypeId: string | null;
   activityTypeName?: string;
   title: string;
   partySize: number;
@@ -567,7 +567,7 @@ export interface ActivityByDate extends ActivityScheduled {
 }
 
 export interface ActivityCreateRequest {
-  activityTypeId: string;
+  activityTypeId?: string | null;
   title: string;
   partySize: number;
   adultPrice: number;
@@ -585,7 +585,7 @@ export interface ActivityCreateResponse extends ActivityScheduled {
 }
 
 export interface ActivityUpdateRequest {
-  activityTypeId?: string;
+  activityTypeId?: string | null;
   title?: string;
   partySize?: number;
   adultPrice?: number;

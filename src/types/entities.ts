@@ -752,9 +752,18 @@ export interface AvailabilityInfo {
   availableSpaces: number;
 }
 
+export type BookingOrderBy =
+  | "schedule_asc"
+  | "schedule_desc"
+  | "created_desc"
+  | "created_asc"
+  | "customer_asc";
+
 export interface BookingFilters {
   status?: BookingStatus;
   activityScheduleId?: string;
+  search?: string;
+  orderBy?: BookingOrderBy;
 }
 
 // ============================================

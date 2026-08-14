@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, type CSSProperties } from "react";
+import { useEffect, useState, useMemo, useRef, type CSSProperties } from "react";
 import { TableCard, badgeStyles, type Column } from "@/components/ui/TableCard";
 import {
   fetchBookingsWithPagination,
@@ -21,6 +21,9 @@ import { FormInput } from "@/components/form/FormInput";
 import { usePermissions } from "@/hooks/usePermissions";
 import { FormCombobox, type SelectOption } from "@/components/form/FormCombobox";
 import { FormCheckbox } from "@/components/form/FormCheckbox";
+import ScheduleCalendarPicker from "@/components/booking/ScheduleCalendarPicker";
+import ActivityCardPicker from "@/components/booking/ActivityCardPicker";
+import ParticipantCounter from "@/components/booking/ParticipantCounter";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useToastContext } from "@/contexts/ToastContext";
@@ -33,11 +36,15 @@ import {
   Users,
   Wallet,
   ClipboardCheck,
+  BusFront,
+  Check,
+  Search,
 } from "lucide-react";
 import type {
   Booking,
   BookingFormData,
   BookingStatus,
+  BookingOrderBy,
   Activity,
   Company,
   AvailableSchedule,
@@ -93,6 +100,19 @@ export default function BookingsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState<BookingStatus | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [orderBy, setOrderBy] = useState<BookingOrderBy>("schedule_asc");
+  const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
+
+  // Debounce de la búsqueda: espera a que el usuario deje de escribir.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   // Estados para el formulario
   const [selectedActivityId, setSelectedActivityId] = useState<string>("");
@@ -219,17 +239,6 @@ export default function BookingsPage() {
     useManualReferencePoint,
   ]);
 
-  const scheduleOptions: SelectOption[] = useMemo(
-    () =>
-      availableSchedules
-        .filter((s) => s.status === true) // Mostrar todas las fechas activas
-        .map((schedule) => ({
-          value: schedule.id,
-          label: `${dateTimeFormatter.format(new Date(schedule.scheduledStart))} - ${dateTimeFormatter.format(new Date(schedule.scheduledEnd))} (Disponibles: ${schedule.availableSpaces})`,
-        })),
-    [availableSchedules, dateTimeFormatter]
-  );
-
   useEffect(() => {
     loadCatalogs();
   }, []);
@@ -240,7 +249,15 @@ export default function BookingsPage() {
 
   useEffect(() => {
     loadBookings();
-  }, [page, pageSize, statusFilter]);
+  }, [page, pageSize, statusFilter, search, orderBy]);
+
+  // Cerrar el detalle con Escape.
+  useEffect(() => {
+    if (!detailBooking) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDetailBooking(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [detailBooking]);
 
   useEffect(() => {
     if (selectedActivityId) {
@@ -306,6 +323,8 @@ export default function BookingsPage() {
       setLoading(true);
       const response = await fetchBookingsWithPagination(page, pageSize, {
         status: statusFilter || undefined,
+        search: search || undefined,
+        orderBy,
       });
       setBookings(response.items);
       setTotalPages(response.totalPages);
@@ -533,10 +552,15 @@ export default function BookingsPage() {
     return parsePrice(price).toFixed(2);
   };
 
-  /** Al editar, el API cuenta esta reserva como ocupada: se suman sus plazas al cupo usable. */
+  /** Tope ABSOLUTO de personas. Al editar, el API cuenta esta reserva como ocupada,
+   *  así que sus propias plazas se suman de vuelta al cupo usable. */
   const maxParticipantsAllowed = useMemo(() => {
     if (!availabilityInfo) return undefined;
-    return availabilityInfo.availableSpaces;
+    // OJO: el API devuelve availableSpaces como texto ("4"); hay que forzar a número
+    // o el "+" concatena en vez de sumar ("4" + 4 = "44").
+    const free = Number(availabilityInfo.availableSpaces) || 0;
+    const own = editingBooking ? Number(editingBooking.numberOfPeople) || 0 : 0;
+    return free + own;
   }, [availabilityInfo, editingBooking]);
 
   const validateWizardStep0 = (): string | null => {
@@ -562,13 +586,12 @@ export default function BookingsPage() {
       return "La cantidad de personas es obligatoria y debe ser mayor a 0.";
     }
 
-    /* Crear: tope = cupos libres. Editar: tope = participantes originales + cupos libres (sin cambio de total siempre pasa). */
-    const valor= editingBooking?editingBooking.numberOfPeople:0;
-    const valueFieldsAvaleible= numberOfPeopleValue-valor
+    /* maxParticipantsAllowed ya es el tope ABSOLUTO (al editar incluye las plazas de la
+       propia reserva), así que se compara contra el total, no contra el cambio. */
     if (
       availabilityInfo &&
       maxParticipantsAllowed !== undefined &&
-    valueFieldsAvaleible > maxParticipantsAllowed
+      numberOfPeopleValue > maxParticipantsAllowed
     ) {
       return editingBooking
         ? `No hay suficientes cupos. Puedes tener hasta ${maxParticipantsAllowed} participante(s) (${editingBooking.numberOfPeople} de tu reserva + ${availabilityInfo.availableSpaces} cupo(s) libre(s) en la actividad).`
@@ -639,6 +662,39 @@ export default function BookingsPage() {
   const validateFullBookingForm = (): string | null =>
     validateWizardStep0() ?? validateWizardStep1() ?? validateWizardStep2();
 
+  // Refs para el auto-scroll guiado.
+  const wizardTopRef = useRef<HTMLElement>(null);
+  const transporteRef = useRef<HTMLDivElement>(null);
+
+  // Al cambiar de paso, vuelve al inicio del asistente (empezar limpio).
+  useEffect(() => {
+    wizardTopRef.current?.scrollIntoView({ block: "start" });
+  }, [bookingWizardStep]);
+
+  /** El paso actual está completo (sin errores de validación). */
+  const currentStepComplete =
+    bookingWizardStep === 0
+      ? validateWizardStep0() === null
+      : bookingWizardStep === 1
+        ? validateWizardStep1() === null
+        : bookingWizardStep === 2
+          ? validateWizardStep2() === null
+          : true;
+
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((formData.customerEmail || "").trim());
+  const clienteSectionOk = formData.customerName.trim() !== "" && emailLooksValid;
+  const pagoSectionOk = !!formData.paymentTypeId;
+  const transporteSectionOk =
+    !formData.transport ||
+    ((formData.passengerCount ?? 0) >= 1 &&
+      (useManualReferencePoint
+        ? (formData.referencePointDescription || "").trim() !== ""
+        : !!formData.referencePointId));
+  const companiaSectionOk =
+    !!formData.companyId &&
+    formData.commissionPercentage !== undefined &&
+    formData.commissionPercentage !== null;
+
   const goNextBookingWizardStep = () => {
     if (bookingWizardStep === 0) {
       const err = validateWizardStep0();
@@ -687,6 +743,27 @@ export default function BookingsPage() {
       typeof formData.numberOfPeopleInput === "string"
         ? parseInt(formData.numberOfPeopleInput.trim(), 10)
         : formData.numberOfPeopleInput;
+
+    // Confirmación antes de crear/guardar (evita envíos por error).
+    const confirmed = await confirm({
+      title: editingBooking ? "Guardar cambios" : "Confirmar reserva",
+      message: (
+        <>
+          {editingBooking ? "¿Guardar los cambios de esta reserva?" : "¿Crear esta reserva?"}
+          <br />
+          <br />
+          <strong style={{ color: "#0f172a" }}>{selectedActivityLabel}</strong>
+          <br />
+          {scheduleSummaryRange}
+          <br />
+          {numberOfPeopleValue} persona(s) · Total <strong style={{ color: "#0f766e" }}>${bookingEstimatedGrandTotal.toFixed(2)}</strong>
+        </>
+      ),
+      variant: "info",
+      confirmText: editingBooking ? "Guardar" : "Confirmar reserva",
+      cancelText: "Revisar",
+    });
+    if (!confirmed) return;
 
     const adultVal = parseCount(formData.adultCountInput);
     const childVal = parseCount(formData.childCountInput);
@@ -824,6 +901,47 @@ export default function BookingsPage() {
     [bookingEstimatedTotal, bookingEstimatedTaxAmount]
   );
 
+  /** Fija el valor absoluto de una categoría, respetando el máximo de cupos. */
+  const applyParticipant = (
+    field: "adult" | "child" | "senior" | "infant",
+    nextRaw: number
+  ) => {
+    const current = {
+      adult: parseCount(formData.adultCountInput),
+      child: parseCount(formData.childCountInput),
+      senior: parseCount(formData.seniorCountInput),
+      infant: parseCount(formData.infantCountInput),
+    };
+    const othersTotal =
+      current.adult + current.child + current.senior + current.infant - current[field];
+    const cap = maxParticipantsAllowed ?? Number.POSITIVE_INFINITY;
+    const maxForField = Math.max(0, cap - othersTotal);
+    const next = Number.isFinite(nextRaw) ? nextRaw : 0;
+    current[field] = Math.min(Math.max(0, Math.floor(next)), maxForField);
+    const total = current.adult + current.child + current.senior + current.infant;
+    setFormData((prev) => ({
+      ...prev,
+      adultCountInput: current.adult,
+      childCountInput: current.child,
+      seniorCountInput: current.senior,
+      infantCountInput: current.infant,
+      numberOfPeople: total,
+      numberOfPeopleInput: total > 0 ? total : "",
+      passengerCount:
+        prev.transport && total > 0 && (!prev.passengerCount || prev.passengerCount < total)
+          ? total
+          : prev.passengerCount,
+    }));
+  };
+
+  /** Suma o resta participantes de una categoría (botones − / +). */
+  const changeParticipant = (
+    field: "adult" | "child" | "senior" | "infant",
+    delta: number
+  ) => {
+    applyParticipant(field, parseCount(formData[`${field}CountInput` as keyof typeof formData] as string | number) + delta);
+  };
+
   const bookingWizardStepsMeta = useMemo(
     () =>
       [
@@ -850,44 +968,6 @@ export default function BookingsPage() {
       ] as const,
     []
   );
-
-  const summarySectionStyle: CSSProperties = {
-    padding: "14px 16px",
-    borderRadius: "10px",
-    border: "1px solid #e2e8f0",
-    background: "#fafafa",
-  };
-
-  /** Tarjetas del resumen: misma altura en la cuadrícula 2×2 */
-  const summaryCardStyle: CSSProperties = {
-    ...summarySectionStyle,
-    minHeight: 0,
-    height: "100%",
-    display: "flex",
-    flexDirection: "column",
-    boxSizing: "border-box",
-    overflowY: "auto",
-  };
-
-  /** 2×2 con misma altura por fila y filas equilibradas */
-  const summaryGridStyle: CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
-    gridTemplateRows: isMobile ? "auto" : "repeat(2, 1fr)",
-    gap: "16px",
-    minHeight: isMobile ? "auto" : "clamp(400px, 42vh, 560px)",
-    height: isMobile ? "auto" : "clamp(400px, 42vh, 560px)",
-    alignItems: "stretch",
-  };
-
-  const summaryRowStyle: CSSProperties = {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "12px",
-    fontSize: "0.875rem",
-    padding: "6px 0",
-    borderBottom: "1px solid #f1f5f9",
-  };
 
   const stepIntroStyle: CSSProperties = {
     display: "flex",
@@ -1043,93 +1123,12 @@ export default function BookingsPage() {
       accessor: (b) => b.numberOfPeople,
     },
     {
-      key: "desglose",
-      header: "Desglose",
-      width: "140px",
-      align: "center",
-      hideOnMobile: true,
-      accessor: (b) =>
-        `${b.adultCount ?? 0} A / ${b.childCount ?? 0} N / ${b.seniorCount ?? 0} M / ${b.infantCount ?? 0} I`,
-    },
-    {
-      key: "companyName",
-      header: "Compañía",
-      hideOnMobile: true,
-      accessor: (b) => b.companyName || "-",
-    },
-    {
-      key: "transport",
-      header: "Transporte",
-      width: "120px",
-      align: "center",
-      hideOnMobile: true,
-      render: (b) => (
-        <span
-          style={{
-            ...badgeStyles.base,
-            ...(b.transport ? badgeStyles.success : badgeStyles.info),
-          }}
-        >
-          {b.transport ? `Sí${b.passengerCount ? ` (${b.passengerCount})` : ""}` : "No"}
-        </span>
-      ),
-    },
-    {
-      key: "commissionPercentage",
-      header: "Comisión (%)",
-      width: "120px",
-      align: "center",
-      hideOnMobile: true,
-      accessor: (b) => `${b.commissionPercentage}%`,
-    },
-    {
-      key: "commissionAmount",
-      header: "Comisión ($)",
-      width: "110px",
-      align: "right",
-      hideOnMobile: true,
-      accessor: (b) =>
-        b.commissionAmount != null ? `$${formatPrice(b.commissionAmount)}` : "—",
-    },
-    {
-      key: "subtotal",
-      header: "Subtotal",
-      width: "100px",
-      align: "right",
-      hideOnMobile: true,
-      accessor: (b) => (b.subtotal != null ? `$${formatPrice(b.subtotal)}` : "—"),
-    },
-    {
-      key: "vatAmount",
-      header: "IVA",
-      width: "90px",
-      align: "right",
-      hideOnMobile: true,
-      accessor: (b) => (b.vatAmount != null ? `$${formatPrice(b.vatAmount)}` : "—"),
-    },
-    {
       key: "total",
       header: "Total",
-      width: "100px",
+      width: "110px",
       align: "right",
-      hideOnMobile: true,
-      accessor: (b) => (b.total != null ? `$${formatPrice(b.total)}` : "—"),
-    },
-    {
-      key: "exempt",
-      header: "Exon. IVA",
-      width: "100px",
-      align: "center",
-      hideOnMobile: true,
       render: (b) => (
-        <span
-          style={{
-            ...badgeStyles.base,
-            ...(b.exempt ? badgeStyles.success : badgeStyles.info),
-          }}
-        >
-          {b.exempt ? "Sí" : "No"}
-        </span>
+        <strong style={{ color: "#0f766e" }}>{b.total != null ? `$${formatPrice(b.total)}` : "—"}</strong>
       ),
     },
     {
@@ -1142,7 +1141,7 @@ export default function BookingsPage() {
     {
       key: "actions",
       header: "Acciones",
-      width: "180px",
+      width: "150px",
       align: "center",
       render: (b) => (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
@@ -1150,7 +1149,7 @@ export default function BookingsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleEditBooking(b)}
+              onClick={(e) => { e.stopPropagation(); handleEditBooking(b); }}
               icon={<Edit size={16} />}
               style={{ padding: "4px 8px" }}
               disabled={!canModifyBooking(b.scheduledStart)}
@@ -1165,7 +1164,7 @@ export default function BookingsPage() {
             <Button
               variant="danger"
               size="sm"
-              onClick={() => handleCancelBooking(b)}
+              onClick={(e) => { e.stopPropagation(); handleCancelBooking(b); }}
               icon={<X size={16} />}
               style={{ padding: "4px 8px" }}
               disabled={!canModifyBooking(b.scheduledStart)}
@@ -1191,9 +1190,58 @@ export default function BookingsPage() {
     []
   );
 
+  const orderOptions: SelectOption[] = useMemo(
+    () => [
+      { value: "schedule_asc", label: "Fecha del tour (próximas primero)" },
+      { value: "schedule_desc", label: "Fecha del tour (lejanas primero)" },
+      { value: "created_desc", label: "Creación (más recientes)" },
+      { value: "created_asc", label: "Creación (más antiguas)" },
+      { value: "customer_asc", label: "Cliente (A–Z)" },
+    ],
+    []
+  );
+
   const headerExtra = (
     <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-      <div style={{ minWidth: "220px", flex: 1 }}>
+      <div style={{ minWidth: "230px", flex: 2, marginBottom: "16px" }}>
+        <label
+          style={{
+            display: "block",
+            marginBottom: "6px",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            color: "#1e293b",
+          }}
+        >
+          Buscar
+        </label>
+        <div className="ap-search-wrap" style={{ marginBottom: 0 }}>
+          <Search size={16} className="ap-search-icon" />
+          <input
+            className="ap-search"
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Cliente, actividad, compañía o email..."
+            disabled={loading}
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput("")}
+              aria-label="Limpiar búsqueda"
+              style={{
+                position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)",
+                border: "none", background: "transparent", cursor: "pointer", color: "#94a3b8",
+                display: "inline-flex", alignItems: "center",
+              }}
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ minWidth: "170px", flex: 1 }}>
         <FormCombobox
           label="Estado"
           value={statusFilter ?? ""}
@@ -1209,8 +1257,28 @@ export default function BookingsPage() {
           disabled={loading}
         />
       </div>
+      <div style={{ minWidth: "200px", flex: 1 }}>
+        <FormCombobox
+          label="Ordenar por"
+          value={orderBy}
+          onChange={(value) => {
+            setOrderBy((String(value) || "schedule_asc") as BookingOrderBy);
+            setPage(1);
+          }}
+          options={orderOptions}
+          placeholder="Ordenar por"
+          searchPlaceholder="Buscar..."
+          fullWidth
+          disabled={loading}
+        />
+      </div>
       {canWrite && (
-        <Button onClick={handleCreateBooking} icon={<Plus size={18} />} size="sm">
+        <Button
+          onClick={handleCreateBooking}
+          icon={<Plus size={18} />}
+          size="md"
+          style={{ height: "40px", marginBottom: "16px" }}
+        >
           Nueva reserva
         </Button>
       )}
@@ -1227,6 +1295,7 @@ export default function BookingsPage() {
         rowKey={(b) => b.id}
         emptyText="No hay reservas aún"
         headerExtra={headerExtra}
+        onRowClick={(b) => setDetailBooking(b)}
         footer={
           <Pagination
             current={page}
@@ -1295,6 +1364,7 @@ export default function BookingsPage() {
                     type="button"
                     onClick={goNextBookingWizardStep}
                     disabled={formLoading}
+                    className={currentStepComplete ? "bk-next-ready" : ""}
                   >
                     Siguiente
                   </Button>
@@ -1326,7 +1396,7 @@ export default function BookingsPage() {
               e.preventDefault();
             }}
           >
-            <nav aria-label="Pasos del asistente de reserva" style={{ marginBottom: "22px" }}>
+            <nav ref={wizardTopRef} aria-label="Pasos del asistente de reserva" style={{ marginBottom: "22px" }}>
               <div
                 style={{
                   display: "grid",
@@ -1424,6 +1494,9 @@ export default function BookingsPage() {
               </div>
             </nav>
 
+            <div className={`bk-layout ${bookingWizardStep === BOOKING_WIZARD_LAST_STEP ? "bk-layout--full" : ""}`}>
+              <div className="bk-main">
+
             {bookingWizardStep === 0 && (
               <div
                 style={{
@@ -1446,26 +1519,37 @@ export default function BookingsPage() {
                   persona antes de continuar.
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <FormCombobox
-                  label="Actividad"
-                  value={selectedActivityId}
-                  onChange={(value) => {
-                    setSelectedActivityId(String(value));
-                    setSelectedScheduleId("");
-                    setSelectedSchedule(null);
-                    setAvailabilityInfo(null);
-                    setFormData((prev) => ({
-                      ...prev,
-                      activityScheduleId: "",
-                    }));
-                  }}
-                  options={activityOptions}
-                  placeholder={catalogsLoading ? "Cargando..." : "Selecciona una actividad"}
-                  searchPlaceholder="Buscar actividad..."
-                  required
-                  fullWidth
-                  disabled={catalogsLoading || formLoading || !!editingBooking}
-                />
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "6px",
+                      fontSize: "0.875rem",
+                      fontWeight: 500,
+                      color: "#1e293b",
+                    }}
+                  >
+                    Actividad
+                    <span style={{ color: "#ef4444", marginLeft: "4px" }}>*</span>
+                  </label>
+                  {catalogsLoading ? (
+                    <div className="ap-empty">Cargando actividades...</div>
+                  ) : (
+                    <ActivityCardPicker
+                      activities={activities}
+                      value={selectedActivityId}
+                      onChange={(id) => {
+                        setSelectedActivityId(id);
+                        setSelectedScheduleId("");
+                        setSelectedSchedule(null);
+                        setAvailabilityInfo(null);
+                        setFormData((prev) => ({ ...prev, activityScheduleId: "" }));
+                      }}
+                      disabled={formLoading || !!editingBooking}
+                      formatPrice={formatPrice}
+                    />
+                  )}
+                </div>
 
                 {selectedActivityId && (
                   <>
@@ -1484,101 +1568,37 @@ export default function BookingsPage() {
                         No hay fechas para esta actividad. Elige otra o crea una planeación.
                       </div>
                     )}
-                    <FormCombobox
-                      label="Fecha y hora"
-                      value={selectedScheduleId}
-                      onChange={(value) => {
-                        setSelectedScheduleId(String(value));
-                        setFormData((prev) => ({
-                          ...prev,
-                          adultCountInput: "",
-                          childCountInput: "",
-                          seniorCountInput: "",
-                          infantCountInput: "",
-                        }));
-                      }}
-                      options={scheduleOptions}
-                      placeholder={
-                        availableSchedules.length === 0
-                          ? "No hay fechas disponibles"
-                          : "Selecciona una fecha"
-                      }
-                      searchPlaceholder="Buscar fecha..."
-                      required
-                      fullWidth
-                      disabled={formLoading || availableSchedules.length === 0}
-                    />
+                    <div>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "6px",
+                          fontSize: "0.875rem",
+                          fontWeight: 500,
+                          color: "#1e293b",
+                        }}
+                      >
+                        Fecha y hora
+                        <span style={{ color: "#ef4444", marginLeft: "4px" }}>*</span>
+                      </label>
+                      <ScheduleCalendarPicker
+                        schedules={availableSchedules}
+                        value={selectedScheduleId}
+                        onChange={(id) => {
+                          setSelectedScheduleId(id);
+                          setFormData((prev) => ({
+                            ...prev,
+                            adultCountInput: "",
+                            childCountInput: "",
+                            seniorCountInput: "",
+                            infantCountInput: "",
+                          }));
+                        }}
+                        disabled={formLoading}
+                        formatPrice={formatPrice}
+                      />
+                    </div>
                   </>
-                )}
-
-                {(availabilityInfo || selectedSchedule) && (
-                  <div
-                    style={{
-                      padding: "10px 12px",
-                      backgroundColor: "#f8fafc",
-                      borderRadius: "8px",
-                      border: "1px solid #e2e8f0",
-                      fontSize: "0.8125rem",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                    }}
-                  >
-                    {availabilityInfo && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                          gap: "8px 12px",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <span style={{ color: "#64748b" }}>
-                          Cupo {availabilityInfo.partySize} · Ocupados {availabilityInfo.bookedPeople}
-                        </span>
-                        <span
-                          style={{
-                            ...badgeStyles.base,
-                            ...(availabilityInfo.availableSpaces > 0
-                              ? badgeStyles.success
-                              : badgeStyles.danger),
-                          }}
-                        >
-                          {availabilityInfo.availableSpaces} libres
-                        </span>
-                      </div>
-                    )}
-                    {selectedSchedule && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: "10px 14px",
-                          color: "#475569",
-                        }}
-                      >
-                        {selectedSchedule.adultPrice !== undefined && (
-                          <span>
-                            Adultos <strong>${formatPrice(selectedSchedule.adultPrice)}</strong>
-                          </span>
-                        )}
-                        {selectedSchedule.childPrice !== undefined && (
-                          <span>
-                            Niños <strong>${formatPrice(selectedSchedule.childPrice)}</strong>
-                          </span>
-                        )}
-                        {selectedSchedule.seniorPrice !== undefined && (
-                          <span>
-                            Mayores <strong>${formatPrice(selectedSchedule.seniorPrice)}</strong>
-                          </span>
-                        )}
-                        <span>
-                          Infantes <strong>$0.00</strong>
-                        </span>
-                      </div>
-                    )}
-                  </div>
                 )}
                 </div>
               </div>
@@ -1594,848 +1614,506 @@ export default function BookingsPage() {
                   gap: "14px",
                 }}
               >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "0.9375rem",
-                    color: "#475569",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Indica el total de personas y reparte entre adultos, niños, adultos mayores e
-                  infantes. La suma debe coincidir con el total y respetar el máximo de cupos.
+                <p className="pc-intro">
+                  Ajusta cuántas personas van en cada categoría. El total y el precio se calculan
+                  solos y se muestran en el panel «Tu reserva».
                 </p>
-                <FormInput
-                  label="Cantidad total"
-                  type="number"
-                  min={1}
-                  max={maxParticipantsAllowed}
-                  value={formData.numberOfPeopleInput}
-                  onChange={(e) => {
-                    const inputValue = e.target.value === "" ? "" : e.target.value;
-                    const parsed = inputValue === "" ? null : parseInt(inputValue, 10);
-                    const total =
-                      parsed !== null && !Number.isNaN(parsed) && parsed >= 0 ? parsed : 0;
-                    setFormData({
-                      ...formData,
-                      numberOfPeopleInput: inputValue,
-                      numberOfPeople: total,
-                      adultCountInput: total,
-                      childCountInput: 0,
-                      seniorCountInput: 0,
-                      infantCountInput: 0,
-                      passengerCount:
-                        formData.transport &&
-                        total > 0 &&
-                        (!formData.passengerCount || formData.passengerCount < total)
-                          ? total
-                          : formData.passengerCount,
-                    });
-                  }}
-                  required
-                  fullWidth
-                  disabled={formLoading || !availabilityInfo}
-                  helperText={
-                    availabilityInfo && maxParticipantsAllowed !== undefined
-                      ? `Máx. ${maxParticipantsAllowed}${
-                          editingBooking
-                            ? " (cupos libres)"
-                            : ""
-                        }. La suma por categoría debe coincidir.`
-                      : "Elige fecha primero"
-                  }
-                />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-                    gap: "10px", 
-                  }}
-                >
-                  <div>
-                    <FormInput
-                      label="Adultos"
-                      type="number"
-                      min={0}
-                      value={formData.adultCountInput}
-                      onChange={(e) => {
-                        const v = e.target.value === "" ? "" : e.target.value;
-                        const adultCount = parseCount(v);
-                        const childCount = parseCount(formData.childCountInput);
-                        const seniorCount = parseCount(formData.seniorCountInput);
-                        const infantCount = parseCount(formData.infantCountInput);
-                        const total = adultCount + childCount + seniorCount + infantCount;
-                        setFormData({
-                          ...formData,
-                          adultCountInput: v,
-                          numberOfPeopleInput: total > 0 ? total : "",
-                          numberOfPeople: total,
-                        });
-                      }}
-                      fullWidth
-                      disabled={formLoading || !availabilityInfo}
-                      placeholder="0"
-                    />
-                    {selectedSchedule?.adultPrice !== undefined &&
-                      formData.adultCountInput !== "" && (
-                        <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
-                          = $
-                          {(
-                            parseCount(formData.adultCountInput) *
-                            parsePrice(selectedSchedule.adultPrice)
-                          ).toFixed(2)}
+                {!availabilityInfo ? (
+                  <div className="ap-empty">Elige una fecha y horario en el paso anterior para continuar.</div>
+                ) : (
+                  (() => {
+                    const adults = parseCount(formData.adultCountInput);
+                    const children = parseCount(formData.childCountInput);
+                    const seniors = parseCount(formData.seniorCountInput);
+                    const infants = parseCount(formData.infantCountInput);
+                    const total = adults + children + seniors + infants;
+                    const cap = maxParticipantsAllowed ?? Number.POSITIVE_INFINITY;
+                    const atMax = total >= cap;
+                    return (
+                      <>
+                        <div className="pc-head">
+                          <span className="pc-head-title">Participantes</span>
+                          <span className={`pc-total-badge ${atMax ? "pc-total-badge--full" : ""}`}>
+                            {total}{maxParticipantsAllowed !== undefined ? ` de ${maxParticipantsAllowed}` : ""} cupos
+                          </span>
                         </div>
-                      )}
-                  </div>
-                  <div>
-                    <FormInput
-                      label="Niños"
-                      type="number"
-                      min={0}
-                      value={formData.childCountInput}
-                      onChange={(e) => {
-                        const v = e.target.value === "" ? "" : e.target.value;
-                        const adultCount = parseCount(formData.adultCountInput);
-                        const childCount = parseCount(v);
-                        const seniorCount = parseCount(formData.seniorCountInput);
-                        const infantCount = parseCount(formData.infantCountInput);
-                        const total = adultCount + childCount + seniorCount + infantCount;
-                        setFormData({
-                          ...formData,
-                          childCountInput: v,
-                          numberOfPeopleInput: total > 0 ? total : "",
-                          numberOfPeople: total,
-                        });
-                      }}
-                      fullWidth
-                      disabled={formLoading || !availabilityInfo}
-                      placeholder="0"
-                    />
-                    {selectedSchedule?.childPrice !== undefined &&
-                      formData.childCountInput !== "" && (
-                        <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
-                          = $
-                          {(
-                            parseCount(formData.childCountInput) *
-                            parsePrice(selectedSchedule.childPrice)
-                          ).toFixed(2)}
+                        <div className="pc-list">
+                          <ParticipantCounter
+                            label="Adultos"
+                            pricePerPerson={selectedSchedule?.adultPrice}
+                            count={adults}
+                            onDec={() => changeParticipant("adult", -1)}
+                            onInc={() => changeParticipant("adult", 1)}
+                            onSet={(v) => applyParticipant("adult", v)}
+                            incDisabled={formLoading || atMax}
+                            formatPrice={formatPrice}
+                          />
+                          <ParticipantCounter
+                            label="Niños"
+                            pricePerPerson={selectedSchedule?.childPrice}
+                            count={children}
+                            onDec={() => changeParticipant("child", -1)}
+                            onInc={() => changeParticipant("child", 1)}
+                            onSet={(v) => applyParticipant("child", v)}
+                            incDisabled={formLoading || atMax}
+                            formatPrice={formatPrice}
+                          />
+                          <ParticipantCounter
+                            label="Mayores"
+                            pricePerPerson={selectedSchedule?.seniorPrice}
+                            count={seniors}
+                            onDec={() => changeParticipant("senior", -1)}
+                            onInc={() => changeParticipant("senior", 1)}
+                            onSet={(v) => applyParticipant("senior", v)}
+                            incDisabled={formLoading || atMax}
+                            formatPrice={formatPrice}
+                          />
+                          <ParticipantCounter
+                            label="Infantes"
+                            pricePerPerson={0}
+                            note="Menores de 6 años"
+                            count={infants}
+                            onDec={() => changeParticipant("infant", -1)}
+                            onInc={() => changeParticipant("infant", 1)}
+                            onSet={(v) => applyParticipant("infant", v)}
+                            incDisabled={formLoading || atMax}
+                            formatPrice={formatPrice}
+                          />
                         </div>
-                      )}
-                  </div>
-                  <div>
-                    <FormInput
-                      label="Mayores"
-                      type="number"
-                      min={0}
-                      value={formData.seniorCountInput}
-                      onChange={(e) => {
-                        const v = e.target.value === "" ? "" : e.target.value;
-                        const adultCount = parseCount(formData.adultCountInput);
-                        const childCount = parseCount(formData.childCountInput);
-                        const seniorCount = parseCount(v);
-                        const infantCount = parseCount(formData.infantCountInput);
-                        const total = adultCount + childCount + seniorCount + infantCount;
-                        setFormData({
-                          ...formData,
-                          seniorCountInput: v,
-                          numberOfPeopleInput: total > 0 ? total : "",
-                          numberOfPeople: total,
-                        });
-                      }}
-                      fullWidth
-                      disabled={formLoading || !availabilityInfo}
-                      placeholder="0"
-                    />
-                    {selectedSchedule?.seniorPrice !== undefined &&
-                      formData.seniorCountInput !== "" && (
-                        <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
-                          = $
-                          {(
-                            parseCount(formData.seniorCountInput) *
-                            parsePrice(selectedSchedule.seniorPrice)
-                          ).toFixed(2)}
-                        </div>
-                      )}
-                  </div>
-                  <div>
-                    <FormInput
-                      label="Infantes"
-                      type="number"
-                      min={0}
-                      value={formData.infantCountInput}
-                      onChange={(e) => {
-                        const v = e.target.value === "" ? "" : e.target.value;
-                        const adultCount = parseCount(formData.adultCountInput);
-                        const childCount = parseCount(formData.childCountInput);
-                        const seniorCount = parseCount(formData.seniorCountInput);
-                        const infantCount = parseCount(v);
-                        const total = adultCount + childCount + seniorCount + infantCount;
-                        setFormData({
-                          ...formData,
-                          infantCountInput: v,
-                          numberOfPeopleInput: total > 0 ? total : "",
-                          numberOfPeople: total,
-                        });
-                      }}
-                      fullWidth
-                      disabled={formLoading || !availabilityInfo}
-                      placeholder="0"
-                      helperText="Menores a 6 años"
-                    />
-                    {formData.infantCountInput !== "" && (
-                      <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
-                        = $0.00
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {selectedSchedule && (
-                  <div
-                    style={{
-                      padding: "8px 12px",
-                      backgroundColor: "#f0f9ff",
-                      borderRadius: "8px",
-                      border: "1px solid #bae6fd",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span style={{ fontWeight: 600, color: "#0369a1", fontSize: "0.875rem" }}>
-                      Total estimado
-                    </span>
-                    <span style={{ fontWeight: 700, fontSize: "1rem", color: "#0369a1" }}>
-                      ${bookingEstimatedGrandTotal.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                {selectedSchedule && (
-                  <div
-                    style={{
-                      padding: "10px 12px",
-                      border: "1px dashed #cbd5e1",
-                      borderRadius: "8px",
-                      background: "#fff",
-                      display: "grid",
-                      gap: "6px",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
-                      <span style={{ color: "#64748b" }}>Subtotal</span>
-                      <strong>${bookingEstimatedTotal.toFixed(2)}</strong>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem" }}>
-                      <span style={{ color: "#64748b" }}>IVA ({ivaPercentage.toFixed(2)}%)</span>
-                      <strong>${bookingEstimatedTaxAmount.toFixed(2)}</strong>
-                    </div>
-                    {formData.exonerateTax && (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#0f766e" }}>
-                        <span>Exoneración aplicada</span>
-                        <strong>-${bookingEstimatedTaxExoneratedAmount.toFixed(2)}</strong>
-                      </div>
-                    )}
-                    <div style={{ borderTop: "1px solid #e2e8f0", marginTop: "4px", paddingTop: "6px", display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontWeight: 700 }}>Total final</span>
-                      <strong style={{ fontSize: "1rem" }}>${bookingEstimatedGrandTotal.toFixed(2)}</strong>
-                    </div>
-                  </div>
-                )}
-                {(formData.adultCountInput !== "" ||
-                  formData.childCountInput !== "" ||
-                  formData.seniorCountInput !== "" ||
-                  formData.infantCountInput !== "") && (
-                  <div style={{ fontSize: "0.8125rem", color: "#64748b" }}>
-                    Suma categorías:{" "}
-                    {parseCount(formData.adultCountInput) +
-                      parseCount(formData.childCountInput) +
-                      parseCount(formData.seniorCountInput) +
-                      parseCount(formData.infantCountInput)}
-                    {typeof formData.numberOfPeopleInput === "string" &&
-                    formData.numberOfPeopleInput.trim() !== "" &&
-                    !Number.isNaN(parseInt(formData.numberOfPeopleInput.trim(), 10))
-                      ? ` · objetivo ${parseInt(formData.numberOfPeopleInput.trim(), 10)}`
-                      : ""}
-                  </div>
+                        {maxParticipantsAllowed !== undefined && (
+                          <div className="pc-hint">
+                            {atMax
+                              ? "Alcanzaste el máximo de cupos disponibles."
+                              : `Puedes agregar hasta ${maxParticipantsAllowed} ${maxParticipantsAllowed === 1 ? "persona" : "personas"}${editingBooking ? " (incluye las de tu reserva)" : ""}.`}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
                 )}
               </div>
             )}
 
             {bookingWizardStep === 2 && (
-              <div
-                style={{
-                  maxWidth: "1120px",
-                  margin: "0 auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "18px",
-                }}
-              >
-                <div style={stepIntroStyle}>
-                  <div style={stepIntroIconStyle}>
-                    <Wallet size={19} aria-hidden />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, color: "#0f172a" }}>
-                      Cliente, pago y extras
-                    </div>
-                    <div style={{ marginTop: "2px", fontSize: "0.875rem", lineHeight: 1.45 }}>
-                      Completa el contacto, selecciona el tipo de pago y define transporte o
-                      comisión solo cuando aplique.
-                    </div>
-                  </div>
-                </div>
+              <div className="cp-step">
+                <p className="pc-intro">
+                  Completa el contacto y el pago. Agrega transporte o comisión solo si aplica.
+                </p>
 
-                <div style={stepTwoGridStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
-                    <section style={bookingFormCardStyle}>
-                      <div style={sectionHeaderStyle}>
-                        <div>
-                          <span style={sectionEyebrowStyle}>Cliente</span>
-                          <h3 style={sectionTitleStyle}>Datos de contacto</h3>
-                          <p style={sectionHintStyle}>Nombre y medios para localizar al cliente.</p>
-                        </div>
-                        <div style={sectionIconStyle}>
-                          <Users size={18} aria-hidden />
-                        </div>
-                      </div>
-
+                {/* Cliente */}
+                <section className="sm-card">
+                  <div className="sm-card-head">
+                    <span className="sm-icon"><Users size={16} /></span>
+                    <span className="sm-card-title">Cliente</span>
+                    {clienteSectionOk && <span className="cp-check"><Check size={13} /></span>}
+                  </div>
+                  <div className="cp-fields">
+                    <FormInput
+                      label="Nombre"
+                      value={formData.customerName}
+                      onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                      required
+                      fullWidth
+                      disabled={formLoading}
+                    />
+                    <div className="cp-grid2">
                       <FormInput
-                        label="Nombre"
-                        value={formData.customerName}
-                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                        label="Email"
+                        type="email"
+                        value={formData.customerEmail || ""}
+                        onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
                         required
                         fullWidth
                         disabled={formLoading}
-                      />
-                      <div style={fieldGridStyle}>
-                        <FormInput
-                          label="Email"
-                          type="email"
-                          value={formData.customerEmail || ""}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              customerEmail: e.target.value,
-                            })
-                          }
-                          required
-                          fullWidth
-                          disabled={formLoading}
-                          placeholder="correo@ejemplo.com"
-                        />
-                        <FormInput
-                          label="Teléfono"
-                          value={formData.customerPhone || ""}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              customerPhone: e.target.value.trim() || null,
-                            })
-                          }
-                          fullWidth
-                          disabled={formLoading}
-                          placeholder="Opcional"
-                        />
-                      </div>
-                    </section>
-
-                    <section style={bookingFormCardStyle}>
-                      <div style={sectionHeaderStyle}>
-                        <div>
-                          <span style={sectionEyebrowStyle}>Pago</span>
-                          <h3 style={sectionTitleStyle}>Cobro y observaciones</h3>
-                          <p style={sectionHintStyle}>Define el método de pago y cualquier nota interna.</p>
-                        </div>
-                        <div style={sectionIconStyle}>
-                          <Wallet size={18} aria-hidden />
-                        </div>
-                      </div>
-
-                      <FormCombobox
-                        label="Tipo de pago"
-                        value={formData.paymentTypeId || ""}
-                        onChange={(value) => {
-                          const paymentTypeId = value ? String(value) : null;
-                          setFormData({
-                            ...formData,
-                            paymentTypeId,
-                          });
-                        }}
-                        options={paymentTypeOptions}
-                        placeholder="Selecciona tipo"
-                        searchPlaceholder="Buscar..."
-                        required
-                        fullWidth
-                        disabled={formLoading}
+                        placeholder="correo@ejemplo.com"
                       />
                       <FormInput
-                        label="Comentario"
-                        value={formData.comment || ""}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            comment: e.target.value,
-                          })
-                        }
+                        label="Teléfono"
+                        value={formData.customerPhone || ""}
+                        onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value.trim() || null })}
                         fullWidth
                         disabled={formLoading}
                         placeholder="Opcional"
                       />
-                    </section>
+                    </div>
                   </div>
+                </section>
 
-                  <aside style={{ ...bookingFormCardStyle, minWidth: 0 }}>
-                    <div style={sectionHeaderStyle}>
-                      <div>
-                        <span style={sectionEyebrowStyle}>Extras</span>
-                        <h3 style={sectionTitleStyle}>Transporte y comisión</h3>
-                        <p style={sectionHintStyle}>Configura recogida, referencia y compañía asociada.</p>
-                      </div>
-                      <div style={sectionIconStyle}>
-                        <ClipboardCheck size={18} aria-hidden />
+                {/* Pago */}
+                <section className="sm-card">
+                  <div className="sm-card-head">
+                    <span className="sm-icon"><Wallet size={16} /></span>
+                    <span className="sm-card-title">Pago</span>
+                    {pagoSectionOk && <span className="cp-check"><Check size={13} /></span>}
+                  </div>
+                  <div className="cp-fields">
+                    <div>
+                      <div className="cp-field-label">Método de pago<span>*</span></div>
+                      <div className="cp-pay-grid">
+                        {paymentTypes.map((pt) => (
+                          <button
+                            key={pt.id}
+                            type="button"
+                            className={`cp-pay-chip ${formData.paymentTypeId === pt.id ? "cp-pay-chip--active" : ""}`}
+                            onClick={() => {
+                              setFormData({ ...formData, paymentTypeId: pt.id });
+                              // Revela la siguiente sección (transporte) sin brusquedad.
+                              setTimeout(() => transporteRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
+                            }}
+                            disabled={formLoading}
+                          >
+                            {pt.name}
+                          </button>
+                        ))}
                       </div>
                     </div>
+                    <FormInput
+                      label="Comentario"
+                      value={formData.comment || ""}
+                      onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                      fullWidth
+                      disabled={formLoading}
+                      placeholder="Nota interna (opcional)"
+                    />
+                  </div>
+                </section>
 
-                    <div style={transportPanelStyle}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          gap: "12px",
+                {/* Transporte */}
+                <section className="sm-card" ref={transporteRef}>
+                  <div className="cp-toggle-head">
+                    <span className="sm-icon"><BusFront size={16} /></span>
+                    <span className="sm-card-title">Transporte</span>
+                    <div className="cp-head-right">
+                      {formData.transport && transporteSectionOk && <span className="cp-check"><Check size={13} /></span>}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.transport || false}
+                      aria-label="Requiere transporte"
+                      className={`cp-switch ${formData.transport ? "cp-switch--on" : ""}`}
+                      disabled={formLoading}
+                      onClick={() => {
+                        const needsTransport = !formData.transport;
+                        if (!needsTransport) setUseManualReferencePoint(false);
+                        setFormData({
+                          ...formData,
+                          transport: needsTransport,
+                          referencePointId: needsTransport ? formData.referencePointId : null,
+                          referencePointDescription: needsTransport ? formData.referencePointDescription : null,
+                          passengerCount: needsTransport
+                            ? formData.passengerCount ||
+                              (() => {
+                                const numValue =
+                                  typeof formData.numberOfPeopleInput === "string"
+                                    ? parseInt(formData.numberOfPeopleInput.trim(), 10)
+                                    : formData.numberOfPeopleInput;
+                                return Number.isFinite(numValue) && numValue > 0 ? numValue : null;
+                              })()
+                            : null,
+                        });
+                      }}
+                    />
+                    </div>
+                  </div>
+
+                  {formData.transport ? (
+                    <div className="cp-transport-fields">
+                      <FormInput
+                        label="Pasajeros"
+                        type="number"
+                        min={1}
+                        value={
+                          formData.passengerCount !== null && formData.passengerCount !== undefined
+                            ? formData.passengerCount
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData({ ...formData, passengerCount: value !== "" ? parseInt(value, 10) : null });
                         }}
-                      >
+                        required
+                        fullWidth
+                        disabled={formLoading}
+                        placeholder="Nº"
+                        helperText="Por defecto coincide con el total de personas."
+                      />
+
+                      <div className="cp-manual-toggle">
                         <FormCheckbox
-                          label="Requiere transporte"
-                          checked={formData.transport || false}
+                          label="Digitar referencia manual"
+                          checked={useManualReferencePoint}
                           onChange={(e) => {
-                            const needsTransport = e.target.checked;
-                            if (!needsTransport) setUseManualReferencePoint(false);
+                            const manual = e.target.checked;
+                            setUseManualReferencePoint(manual);
                             setFormData({
                               ...formData,
-                              transport: needsTransport,
-                              referencePointId: needsTransport ? formData.referencePointId : null,
-                              referencePointDescription: needsTransport
-                                ? formData.referencePointDescription
-                                : null,
-                              passengerCount: needsTransport
-                                ? formData.passengerCount ||
-                                  (() => {
-                                    const numValue =
-                                      typeof formData.numberOfPeopleInput === "string"
-                                        ? parseInt(formData.numberOfPeopleInput.trim(), 10)
-                                        : formData.numberOfPeopleInput;
-                                    return Number.isFinite(numValue) && numValue > 0 ? numValue : null;
-                                  })()
-                                : null,
+                              referencePointId: manual ? null : formData.referencePointId,
+                              referencePointDescription: manual
+                                ? formData.referencePointDescription ?? ""
+                                : referencePoints.find((point) => point.id === formData.referencePointId)?.description ?? null,
                             });
                           }}
                           disabled={formLoading}
+                          helperText="Si no existe en catálogo, escribe la referencia."
                         />
-                        <span
-                          style={{
-                            ...badgeStyles.base,
-                            ...(formData.transport ? badgeStyles.success : badgeStyles.info),
-                            flexShrink: 0,
-                            marginTop: "2px",
-                          }}
-                        >
-                          {formData.transport ? "Activo" : "Opcional"}
-                        </span>
                       </div>
 
-                      {formData.transport ? (
-                        <div style={transportFieldsGridStyle}>
-                          <FormInput
-                            label="Pasajeros"
-                            type="number"
-                            min={1}
-                            value={
-                              formData.passengerCount !== null && formData.passengerCount !== undefined
-                                ? formData.passengerCount
-                                : ""
-                            }
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setFormData({
-                                ...formData,
-                                passengerCount: value !== "" ? parseInt(value, 10) : null,
-                              });
-                            }}
-                            required
-                            fullWidth
-                            disabled={formLoading}
-                            placeholder="Nº"
-                            helperText="Por defecto coincide con el total."
-                          />
-
-                          <div style={{ minWidth: 0 }}>
-                            <div
-                              style={{
-                                padding: "10px 12px",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0",
-                                background: "#ffffff",
-                                marginBottom: "12px",
-                              }}
-                            >
-                              <FormCheckbox
-                                label="Digitar referencia manual"
-                                checked={useManualReferencePoint}
-                                onChange={(e) => {
-                                  const manual = e.target.checked;
-                                  setUseManualReferencePoint(manual);
-                                  setFormData({
-                                    ...formData,
-                                    referencePointId: manual ? null : formData.referencePointId,
-                                    referencePointDescription: manual
-                                      ? formData.referencePointDescription ?? ""
-                                      : referencePoints.find(
-                                          (point) => point.id === formData.referencePointId
-                                        )?.description ?? null,
-                                  });
-                                }}
-                                disabled={formLoading}
-                                helperText="Si no existe en catálogo, escribe la referencia."
-                              />
-                            </div>
-
-                            {useManualReferencePoint ? (
-                              <FormInput
-                                label="Punto de referencia"
-                                value={formData.referencePointDescription || ""}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    referencePointId: null,
-                                    referencePointDescription: e.target.value,
-                                  })
-                                }
-                                required
-                                fullWidth
-                                disabled={formLoading}
-                                placeholder="Ej. Hotel, entrada principal"
-                              />
-                            ) : (
-                              <FormCombobox
-                                label="Punto de referencia"
-                                value={formData.referencePointId || ""}
-                                onChange={(value) => {
-                                  const referencePointId = value ? String(value) : null;
-                                  setFormData({
-                                    ...formData,
-                                    referencePointId,
-                                    referencePointDescription:
-                                      referencePoints.find((point) => point.id === referencePointId)
-                                        ?.description ?? null,
-                                  });
-                                }}
-                                options={referencePointOptions}
-                                placeholder="Selecciona un punto"
-                                searchPlaceholder="Buscar punto..."
-                                required
-                                fullWidth
-                                disabled={formLoading || catalogsLoading}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            marginTop: "4px",
-                            padding: "10px 12px",
-                            borderRadius: "10px",
-                            background: "#ffffff",
-                            color: "#64748b",
-                            fontSize: "0.8125rem",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          Activa transporte para agregar pasajeros y punto de referencia.
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <div style={{ marginBottom: "10px" }}>
-                        <span style={sectionEyebrowStyle}>Compañía</span>
-                        <p style={sectionHintStyle}>Opcional. Aplica comisión asociada a socios.</p>
-                      </div>
-                      <FormCombobox
-                        label="Compañía"
-                        value={formData.companyId || ""}
-                        onChange={(value) => {
-                          const companyId = value ? String(value) : null;
-                          setFormData({
-                            ...formData,
-                            companyId,
-                            commissionPercentage: companyId
-                              ? companies.find((c) => c.id === companyId)?.commissionPercentage
-                              : undefined,
-                          });
-                        }}
-                        options={companyOptions}
-                        placeholder="Ninguna"
-                        searchPlaceholder="Buscar compañía..."
-                        fullWidth
-                        disabled={formLoading}
-                      />
-                      {formData.companyId && (
+                      {useManualReferencePoint ? (
                         <FormInput
-                          label="Comisión (%)"
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.1"
-                          value={
-                            formData.commissionPercentage !== undefined &&
-                            formData.commissionPercentage !== null
-                              ? formData.commissionPercentage
-                              : companies.find((c) => c.id === formData.companyId)
-                                  ?.commissionPercentage ?? ""
+                          label="Punto de referencia"
+                          value={formData.referencePointDescription || ""}
+                          onChange={(e) =>
+                            setFormData({ ...formData, referencePointId: null, referencePointDescription: e.target.value })
                           }
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setFormData({
-                              ...formData,
-                              commissionPercentage: value !== "" ? parseFloat(value) : undefined,
-                            });
-                          }}
                           required
                           fullWidth
                           disabled={formLoading}
-                          placeholder={`Def. ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}%`}
-                          helperText="Puedes sobrescribir el % de la compañía."
+                          placeholder="Ej. Hotel, entrada principal"
+                        />
+                      ) : (
+                        <FormCombobox
+                          label="Punto de referencia"
+                          value={formData.referencePointId || ""}
+                          onChange={(value) => {
+                            const referencePointId = value ? String(value) : null;
+                            setFormData({
+                              ...formData,
+                              referencePointId,
+                              referencePointDescription:
+                                referencePoints.find((point) => point.id === referencePointId)?.description ?? null,
+                            });
+                          }}
+                          options={referencePointOptions}
+                          placeholder="Selecciona un punto"
+                          searchPlaceholder="Buscar punto..."
+                          required
+                          fullWidth
+                          disabled={formLoading || catalogsLoading}
                         />
                       )}
                     </div>
-                  </aside>
-                </div>
+                  ) : (
+                    <div className="cp-hint">Actívalo si el cliente necesita transporte (pasajeros y punto de recogida).</div>
+                  )}
+                </section>
+
+                {/* Compañía / comisión */}
+                <section className="sm-card">
+                  <div className="sm-card-head">
+                    <span className="sm-icon"><ClipboardCheck size={16} /></span>
+                    <span className="sm-card-title">Compañía y comisión</span>
+                    {companiaSectionOk ? (
+                      <span className="cp-check" style={{ marginLeft: "auto" }}><Check size={13} /></span>
+                    ) : (
+                      <span className="cp-optional">Opcional</span>
+                    )}
+                  </div>
+                  <div className="cp-fields">
+                    <FormCombobox
+                      label="Compañía"
+                      value={formData.companyId || ""}
+                      onChange={(value) => {
+                        const companyId = value ? String(value) : null;
+                        setFormData({
+                          ...formData,
+                          companyId,
+                          commissionPercentage: companyId
+                            ? companies.find((c) => c.id === companyId)?.commissionPercentage
+                            : undefined,
+                        });
+                      }}
+                      options={companyOptions}
+                      placeholder="Ninguna"
+                      searchPlaceholder="Buscar compañía..."
+                      fullWidth
+                      disabled={formLoading}
+                    />
+                    {formData.companyId && (
+                      <FormInput
+                        label="Comisión (%)"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.1"
+                        value={
+                          formData.commissionPercentage !== undefined && formData.commissionPercentage !== null
+                            ? formData.commissionPercentage
+                            : companies.find((c) => c.id === formData.companyId)?.commissionPercentage ?? ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData({ ...formData, commissionPercentage: value !== "" ? parseFloat(value) : undefined });
+                        }}
+                        required
+                        fullWidth
+                        disabled={formLoading}
+                        placeholder={`Def. ${companies.find((c) => c.id === formData.companyId)?.commissionPercentage}%`}
+                        helperText="Puedes sobrescribir el % de la compañía."
+                      />
+                    )}
+                  </div>
+                </section>
               </div>
             )}
 
             {bookingWizardStep === BOOKING_WIZARD_LAST_STEP && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "0.9375rem",
-                    color: "#475569",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Verifica los datos. Puedes volver con el botón Atrás o haciendo clic en un paso
-                  anterior en la barra superior.
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <p className="pc-intro" style={{ margin: 0 }}>
+                  Revisa los datos antes de confirmar. Puedes volver con «Atrás» o tocando un paso de arriba.
                 </p>
-                <div style={summaryGridStyle}>
-                  <div style={summaryCardStyle}>
-                    <div
-                      style={{
-                        fontSize: "0.6875rem",
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "#64748b",
-                        marginBottom: "12px",
-                      }}
-                    >
-                      Actividad y horario
+                {/* Franja-resumen: lo esencial de un vistazo */}
+                <div className="sm-hero">
+                  <div>
+                    <div className="sm-hero-title">{selectedActivityLabel}</div>
+                    <div className="sm-hero-sub">
+                      <CalendarRange size={14} />
+                      {scheduleSummaryRange}
                     </div>
-                    <div style={{ ...summaryRowStyle, borderBottom: "none", paddingTop: 0 }}>
-                      <span style={{ color: "#64748b" }}>Actividad</span>
-                      <strong style={{ textAlign: "right" }}>{selectedActivityLabel}</strong>
+                  </div>
+                  <div className="sm-hero-total">
+                    <div className="sm-hero-total-label">Total estimado</div>
+                    <div className="sm-hero-total-value">${bookingEstimatedGrandTotal.toFixed(2)}</div>
+                  </div>
+                </div>
+
+                <div className="sm-grid">
+                  {/* Actividad y horario */}
+                  <div className="sm-card">
+                    <div className="sm-card-head">
+                      <span className="sm-icon"><CalendarRange size={16} /></span>
+                      <span className="sm-card-title">Actividad y horario</span>
                     </div>
-                    <div style={{ ...summaryRowStyle, borderBottom: "none" }}>
-                      <span style={{ color: "#64748b" }}>Horario</span>
-                      <span style={{ textAlign: "right", fontWeight: 500 }}>{scheduleSummaryRange}</span>
+                    <div className="sm-row">
+                      <span className="sm-label">Actividad</span>
+                      <span className="sm-value">{selectedActivityLabel}</span>
+                    </div>
+                    <div className="sm-row">
+                      <span className="sm-label">Horario</span>
+                      <span className="sm-value sm-value--sub">{scheduleSummaryRange}</span>
                     </div>
                     {availabilityInfo && (
-                      <div
-                        style={{
-                          ...summaryRowStyle,
-                          borderBottom: "none",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span style={{ color: "#64748b" }}>Cupos</span>
-                        <span
-                          style={{
-                            ...badgeStyles.base,
-                            ...(availabilityInfo.availableSpaces > 0
-                              ? badgeStyles.success
-                              : badgeStyles.danger),
-                          }}
-                        >
-                          {availabilityInfo.availableSpaces} libres de {availabilityInfo.partySize}
+                      <div className="sm-row">
+                        <span className="sm-label">Cupos</span>
+                        <span className={`sm-chip ${availabilityInfo.availableSpaces > 0 ? "sm-chip--ok" : "sm-chip--danger"}`}>
+                          {availabilityInfo.availableSpaces > 0
+                            ? `${availabilityInfo.availableSpaces} libres de ${availabilityInfo.partySize}`
+                            : "Agotado"}
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <div style={summaryCardStyle}>
-                    <div
-                      style={{
-                        fontSize: "0.6875rem",
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "#64748b",
-                        marginBottom: "12px",
-                      }}
-                    >
-                      Participantes
+                  {/* Participantes + recibo */}
+                  <div className="sm-card">
+                    <div className="sm-card-head">
+                      <span className="sm-icon"><Users size={16} /></span>
+                      <span className="sm-card-title">Participantes</span>
                     </div>
-                    <div style={summaryRowStyle}>
-                      <span style={{ color: "#64748b" }}>Total personas</span>
-                      <strong>
+                    <div className="sm-row">
+                      <span className="sm-label">Total personas</span>
+                      <span className="sm-value">
                         {typeof formData.numberOfPeopleInput === "string" &&
                         formData.numberOfPeopleInput.trim() !== ""
                           ? parseInt(formData.numberOfPeopleInput.trim(), 10)
                           : formData.numberOfPeople}
-                      </strong>
+                      </span>
                     </div>
-                    <div style={{ ...summaryRowStyle, borderBottom: "none" }}>
-                      <span style={{ color: "#64748b" }}>Adultos / Niños / Mayores</span>
-                      <span>
-                        {parseCount(formData.adultCountInput)} /{" "}
-                        {parseCount(formData.childCountInput)} /{" "}
-                        {parseCount(formData.seniorCountInput)}
+                    <div className="sm-row">
+                      <span className="sm-label">Adultos / Niños / Mayores</span>
+                      <span className="sm-value">
+                        {parseCount(formData.adultCountInput)} / {parseCount(formData.childCountInput)} / {parseCount(formData.seniorCountInput)}
                       </span>
                     </div>
                     {selectedSchedule && (
-                      <div
-                        style={{
-                          marginTop: "10px",
-                          paddingTop: "10px",
-                          borderTop: "1px dashed #e2e8f0",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span style={{ fontWeight: 600, color: "#0369a1" }}>Total estimado</span>
-                        <span style={{ fontWeight: 800, fontSize: "1.125rem", color: "#0369a1" }}>
-                          ${bookingEstimatedGrandTotal.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    {selectedSchedule && (
-                      <div style={{ marginTop: "8px", display: "grid", gap: "4px", fontSize: "0.8125rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "#64748b" }}>Subtotal</span>
+                      <div className="sm-receipt">
+                        <div className="sm-receipt-row">
+                          <span>Subtotal</span>
                           <span>${bookingEstimatedTotal.toFixed(2)}</span>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "#64748b" }}>IVA ({ivaPercentage.toFixed(2)}%)</span>
+                        <div className="sm-receipt-row">
+                          <span>IVA ({ivaPercentage.toFixed(2)}%)</span>
                           <span>${bookingEstimatedTaxAmount.toFixed(2)}</span>
                         </div>
                         {formData.exonerateTax && (
-                          <div style={{ display: "flex", justifyContent: "space-between", color: "#0f766e" }}>
+                          <div className="sm-receipt-row sm-receipt-row--exo">
                             <span>IVA exonerado</span>
                             <span>-${bookingEstimatedTaxExoneratedAmount.toFixed(2)}</span>
                           </div>
                         )}
-                        <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #e2e8f0", paddingTop: "4px", fontWeight: 700 }}>
-                          <span>Total final</span>
-                          <span>${bookingEstimatedGrandTotal.toFixed(2)}</span>
+                        <div className="sm-receipt-total">
+                          <span className="sm-receipt-total-label">Total final</span>
+                          <span className="sm-receipt-total-value">${bookingEstimatedGrandTotal.toFixed(2)}</span>
                         </div>
                       </div>
                     )}
                     {selectedSchedule && (
-                      <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid #e2e8f0" }}>
+                      <div style={{ marginTop: "12px" }}>
                         <FormCheckbox
                           label={`Exonerar impuesto (IVA ${ivaPercentage.toFixed(2)}%)`}
                           checked={formData.exonerateTax}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              exonerateTax: e.target.checked,
-                            })
-                          }
+                          onChange={(e) => setFormData({ ...formData, exonerateTax: e.target.checked })}
                           disabled={formLoading}
                         />
                       </div>
                     )}
                   </div>
 
-                  <div style={summaryCardStyle}>
-                    <div
-                      style={{
-                        fontSize: "0.6875rem",
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "#64748b",
-                        marginBottom: "12px",
-                      }}
-                    >
-                      Cliente y pago
+                  {/* Cliente y pago */}
+                  <div className="sm-card">
+                    <div className="sm-card-head">
+                      <span className="sm-icon"><Wallet size={16} /></span>
+                      <span className="sm-card-title">Cliente y pago</span>
                     </div>
-                    <div style={summaryRowStyle}>
-                      <span style={{ color: "#64748b" }}>Nombre</span>
-                      <strong style={{ textAlign: "right" }}>{formData.customerName || "—"}</strong>
+                    <div className="sm-row">
+                      <span className="sm-label">Nombre</span>
+                      <span className="sm-value">{formData.customerName || "—"}</span>
                     </div>
-                    <div style={summaryRowStyle}>
-                      <span style={{ color: "#64748b" }}>Contacto</span>
-                      <span style={{ textAlign: "right", fontSize: "0.8125rem" }}>
-                        {[formData.customerEmail, formData.customerPhone].filter(Boolean).join(" · ") ||
-                          "—"}
+                    <div className="sm-row">
+                      <span className="sm-label">Contacto</span>
+                      <span className="sm-value sm-value--sub">
+                        {[formData.customerEmail, formData.customerPhone].filter(Boolean).join(" · ") || "—"}
                       </span>
                     </div>
-                    <div style={{ ...summaryRowStyle, borderBottom: "none" }}>
-                      <span style={{ color: "#64748b" }}>Pago</span>
-                      <span style={{ textAlign: "right" }}>
-                        {paymentTypes.find((p) => p.id === formData.paymentTypeId)?.name ?? "—"}
-                      </span>
+                    <div className="sm-row">
+                      <span className="sm-label">Pago</span>
+                      <span className="sm-value">{paymentTypes.find((p) => p.id === formData.paymentTypeId)?.name ?? "—"}</span>
                     </div>
-                    <div style={{ ...summaryRowStyle, borderBottom: "none" }}>
-                      <span style={{ color: "#64748b" }}>Impuesto</span>
-                      <span>{formData.exonerateTax ? "Exonerado" : `IVA ${ivaPercentage.toFixed(2)}%`}</span>
+                    <div className="sm-row">
+                      <span className="sm-label">Impuesto</span>
+                      <span className="sm-value">{formData.exonerateTax ? "Exonerado" : `IVA ${ivaPercentage.toFixed(2)}%`}</span>
                     </div>
                     {formData.comment?.trim() ? (
-                      <div style={{ marginTop: "8px", fontSize: "0.8125rem", color: "#475569" }}>
-                        <span style={{ color: "#64748b" }}>Nota: </span>
-                        {formData.comment}
+                      <div className="sm-note">
+                        <span className="sm-note-label">Nota: </span>{formData.comment}
                       </div>
                     ) : null}
                   </div>
 
-                  <div style={summaryCardStyle}>
-                    <div
-                      style={{
-                        fontSize: "0.6875rem",
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        color: "#64748b",
-                        marginBottom: "12px",
-                      }}
-                    >
-                      Extras
+                  {/* Extras */}
+                  <div className="sm-card">
+                    <div className="sm-card-head">
+                      <span className="sm-icon"><BusFront size={16} /></span>
+                      <span className="sm-card-title">Extras</span>
                     </div>
-                    <div style={summaryRowStyle}>
-                      <span style={{ color: "#64748b" }}>Transporte</span>
-                      <span>
-                        {formData.transport
-                          ? `Sí (${formData.passengerCount ?? "—"} pasajeros)`
-                          : "No"}
+                    <div className="sm-row">
+                      <span className="sm-label">Transporte</span>
+                      <span className="sm-value">
+                        {formData.transport ? `Sí (${formData.passengerCount ?? "—"} pasajeros)` : "No"}
                       </span>
                     </div>
                     {formData.transport && (
-                      <div style={summaryRowStyle}>
-                        <span style={{ color: "#64748b" }}>Punto de referencia</span>
-                        <strong style={{ textAlign: "right" }}>{selectedReferencePointLabel}</strong>
+                      <div className="sm-row">
+                        <span className="sm-label">Punto de referencia</span>
+                        <span className="sm-value">{selectedReferencePointLabel}</span>
                       </div>
                     )}
-                    <div style={{ ...summaryRowStyle, borderBottom: "none" }}>
-                      <span style={{ color: "#64748b" }}>Compañía / Comisión</span>
-                      <span style={{ textAlign: "right", fontSize: "0.8125rem" }}>
+                    <div className="sm-row">
+                      <span className="sm-label">Compañía / Comisión</span>
+                      <span className="sm-value sm-value--sub">
                         {formData.companyId
                           ? `${companies.find((c) => c.id === formData.companyId)?.name ?? ""} · ${
                               formData.commissionPercentage ??
-                              companies.find((c) => c.id === formData.companyId)
-                                ?.commissionPercentage ??
+                              companies.find((c) => c.id === formData.companyId)?.commissionPercentage ??
                               ""
                             }%`
                           : "—"}
@@ -2445,9 +2123,193 @@ export default function BookingsPage() {
                 </div>
               </div>
             )}
+
+              </div>{/* /bk-main */}
+
+              {bookingWizardStep < BOOKING_WIZARD_LAST_STEP && (() => {
+                const railAdults = parseCount(formData.adultCountInput);
+                const railChildren = parseCount(formData.childCountInput);
+                const railSeniors = parseCount(formData.seniorCountInput);
+                const railInfants = parseCount(formData.infantCountInput);
+                const railTotalPeople = railAdults + railChildren + railSeniors + railInfants;
+                const railBreakdown = [
+                  railAdults ? `${railAdults} ad.` : null,
+                  railChildren ? `${railChildren} ni.` : null,
+                  railSeniors ? `${railSeniors} may.` : null,
+                  railInfants ? `${railInfants} inf.` : null,
+                ].filter(Boolean).join(" · ");
+                const railShowReceipt = !!selectedSchedule && railTotalPeople > 0;
+                return (
+                  <aside className="bk-rail">
+                    <div className="bk-rail-card">
+                      <div className="bk-rail-head">
+                        <ClipboardCheck size={14} />
+                        Tu reserva
+                      </div>
+                      <div className="bk-rail-body">
+                        {!selectedActivityId ? (
+                          <div className="bk-rail-empty">Aún no has elegido una actividad.</div>
+                        ) : (
+                          <>
+                            <div className="bk-rail-block">
+                              <span className="bk-rail-block-label">Actividad</span>
+                              <span className="bk-rail-activity">{selectedActivityLabel}</span>
+                              {selectedSchedule && (
+                                <span className="bk-rail-line">
+                                  <CalendarRange size={13} />
+                                  {scheduleSummaryRange}
+                                </span>
+                              )}
+                            </div>
+
+                            {availabilityInfo && (
+                              <span className="bk-rail-chip">
+                                {availabilityInfo.availableSpaces > 0
+                                  ? `${availabilityInfo.availableSpaces} cupos libres`
+                                  : "Agotado"}
+                              </span>
+                            )}
+
+                            {railTotalPeople > 0 && (
+                              <>
+                                <div className="bk-rail-divider" />
+                                <div className="bk-rail-block">
+                                  <span className="bk-rail-block-label">Participantes</span>
+                                  <span className="bk-rail-line">
+                                    <Users size={13} />
+                                    {railTotalPeople} {railTotalPeople === 1 ? "persona" : "personas"}
+                                    {railBreakdown ? ` · ${railBreakdown}` : ""}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+
+                            <div className="bk-rail-divider" />
+                            {railShowReceipt ? (
+                              <div>
+                                <div className="bk-rail-receipt-row">
+                                  <span>Subtotal</span>
+                                  <span>${bookingEstimatedTotal.toFixed(2)}</span>
+                                </div>
+                                <div className="bk-rail-receipt-row">
+                                  <span>IVA ({ivaPercentage.toFixed(2)}%)</span>
+                                  <span>${bookingEstimatedTaxAmount.toFixed(2)}</span>
+                                </div>
+                                {formData.exonerateTax && (
+                                  <div className="bk-rail-receipt-row bk-rail-receipt-row--exo">
+                                    <span>IVA exonerado</span>
+                                    <span>-${bookingEstimatedTaxExoneratedAmount.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                <div className="bk-rail-total">
+                                  <span className="bk-rail-total-label">Total</span>
+                                  <span className="bk-rail-total-value">${bookingEstimatedGrandTotal.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bk-rail-empty">
+                                {selectedSchedule ? "Agrega participantes para ver el total." : "Elige un horario para ver el total."}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </aside>
+                );
+              })()}
+            </div>{/* /bk-layout */}
           </form>
         )}
       </Modal>
+
+      {detailBooking && (
+        <div className="bkd-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setDetailBooking(null); }}>
+          <div className="bkd-panel" role="dialog" aria-modal="true" aria-label="Detalle de la reserva">
+            <div className="bkd-head">
+              <ClipboardCheck size={18} style={{ color: "#0f766e" }} />
+              <h3 className="bkd-title">Detalle de la reserva</h3>
+              {getStatusBadge(detailBooking.status)}
+              <button type="button" className="bkd-close" onClick={() => setDetailBooking(null)} aria-label="Cerrar">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bkd-body">
+              <div>
+                <div className="bkd-section-title"><CalendarRange size={13} /> Actividad</div>
+                <div className="sm-row"><span className="sm-label">Actividad</span><span className="sm-value">{detailBooking.activityTitle || "—"}</span></div>
+                <div className="sm-row"><span className="sm-label">Fecha / hora</span><span className="sm-value sm-value--sub">{detailBooking.scheduledStart ? dateTimeFormatter.format(new Date(detailBooking.scheduledStart)) : "—"}</span></div>
+              </div>
+
+              <div>
+                <div className="bkd-section-title"><Users size={13} /> Participantes</div>
+                <div className="sm-row"><span className="sm-label">Total personas</span><span className="sm-value">{detailBooking.numberOfPeople}</span></div>
+                <div className="sm-row"><span className="sm-label">Adultos / Niños / Mayores / Infantes</span><span className="sm-value">{detailBooking.adultCount ?? 0} / {detailBooking.childCount ?? 0} / {detailBooking.seniorCount ?? 0} / {detailBooking.infantCount ?? 0}</span></div>
+              </div>
+
+              <div>
+                <div className="bkd-section-title"><Wallet size={13} /> Cliente y pago</div>
+                <div className="sm-row"><span className="sm-label">Nombre</span><span className="sm-value">{detailBooking.customerName || "—"}</span></div>
+                <div className="sm-row"><span className="sm-label">Contacto</span><span className="sm-value sm-value--sub">{[detailBooking.customerEmail, detailBooking.customerPhone].filter(Boolean).join(" · ") || "—"}</span></div>
+                <div className="sm-row"><span className="sm-label">Pago</span><span className="sm-value">{detailBooking.paymentTypeName || "—"}</span></div>
+                {detailBooking.comment?.trim() ? (
+                  <div className="sm-note">{detailBooking.comment}</div>
+                ) : null}
+              </div>
+
+              <div>
+                <div className="bkd-section-title"><Wallet size={13} /> Cobro</div>
+                <div className="sm-receipt" style={{ marginTop: 0 }}>
+                  <div className="sm-receipt-row"><span>Subtotal</span><span>{detailBooking.subtotal != null ? `$${formatPrice(detailBooking.subtotal)}` : "—"}</span></div>
+                  <div className="sm-receipt-row"><span>IVA{detailBooking.exempt ? " (exonerado)" : ""}</span><span>{detailBooking.vatAmount != null ? `$${formatPrice(detailBooking.vatAmount)}` : "—"}</span></div>
+                  <div className="sm-receipt-total"><span className="sm-receipt-total-label">Total</span><span className="sm-receipt-total-value">{detailBooking.total != null ? `$${formatPrice(detailBooking.total)}` : "—"}</span></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="bkd-section-title"><BusFront size={13} /> Extras</div>
+                <div className="sm-row"><span className="sm-label">Transporte</span><span className="sm-value">{detailBooking.transport ? `Sí${detailBooking.passengerCount ? ` (${detailBooking.passengerCount} pas.)` : ""}` : "No"}</span></div>
+                {detailBooking.transport && (
+                  <div className="sm-row"><span className="sm-label">Punto de referencia</span><span className="sm-value sm-value--sub">{detailBooking.referencePointDescription || "—"}</span></div>
+                )}
+                <div className="sm-row"><span className="sm-label">Compañía</span><span className="sm-value sm-value--sub">{detailBooking.companyName || "—"}</span></div>
+                {detailBooking.companyName && (
+                  <>
+                    <div className="sm-row"><span className="sm-label">Comisión</span><span className="sm-value">{detailBooking.commissionPercentage}%{detailBooking.commissionAmount != null ? ` · $${formatPrice(detailBooking.commissionAmount)}` : ""}</span></div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="bkd-foot">
+              <Button variant="outline" onClick={() => setDetailBooking(null)}>Cerrar</Button>
+              <div style={{ display: "flex", gap: ".6rem", marginLeft: "auto" }}>
+                {canWrite && (
+                  <Button
+                    variant="outline"
+                    icon={<Edit size={16} />}
+                    disabled={!canModifyBooking(detailBooking.scheduledStart)}
+                    onClick={() => { const b = detailBooking; setDetailBooking(null); handleEditBooking(b); }}
+                  >
+                    Editar
+                  </Button>
+                )}
+                {canDelete && detailBooking.status !== "cancelled" && (
+                  <Button
+                    variant="danger"
+                    icon={<X size={16} />}
+                    disabled={!canModifyBooking(detailBooking.scheduledStart)}
+                    onClick={() => { const b = detailBooking; setDetailBooking(null); handleCancelBooking(b); }}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmDialogComponent />
     </>

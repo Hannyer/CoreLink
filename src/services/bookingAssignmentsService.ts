@@ -324,6 +324,62 @@ export async function fetchMyGuideAssignments(filters: MyAssignmentDateRange = {
   return data || [];
 }
 
+export interface ScheduleBooking {
+  id: string;
+  customerName: string;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  numberOfPeople: number;
+  adultCount: number;
+  childCount: number;
+  seniorCount: number;
+  infantCount: number;
+  status: string;
+  comment?: string | null;
+  transport: boolean;
+  passengerCount?: number | null;
+  referencePointDescription?: string | null;
+  companyName?: string | null;
+}
+
+/** Reservas de una salida donde el guía autenticado está asignado. */
+export async function fetchMyGuideScheduleBookings(activityScheduleId: string): Promise<ScheduleBooking[]> {
+  const { data } = await api.get<ScheduleBooking[]>(
+    `/api/booking-assignments/me/guide/schedules/${activityScheduleId}/bookings`
+  );
+  return data || [];
+}
+
+export interface CalendarSubscription {
+  token: string;
+  feedUrl: string;
+  webcalUrl: string;
+}
+
+/** Obtiene (o crea) el enlace de suscripción de calendario del guía. */
+export async function fetchMyCalendarLink(): Promise<CalendarSubscription> {
+  const { data } = await api.get<CalendarSubscription>("/api/booking-assignments/me/guide/calendar-token");
+  return data;
+}
+
+/** Regenera el enlace de calendario (invalida el anterior). */
+export async function regenerateMyCalendarLink(): Promise<CalendarSubscription> {
+  const { data } = await api.post<CalendarSubscription>("/api/booking-assignments/me/guide/calendar-token/regenerate");
+  return data;
+}
+
+/** Obtiene (o crea) el enlace de suscripción de calendario del conductor. */
+export async function fetchMyDriverCalendarLink(): Promise<CalendarSubscription> {
+  const { data } = await api.get<CalendarSubscription>("/api/booking-assignments/me/driver/calendar-token");
+  return data;
+}
+
+/** Regenera el enlace de calendario del conductor (invalida el anterior). */
+export async function regenerateMyDriverCalendarLink(): Promise<CalendarSubscription> {
+  const { data } = await api.post<CalendarSubscription>("/api/booking-assignments/me/driver/calendar-token/regenerate");
+  return data;
+}
+
 export async function fetchMyDriverAssignments(filters: MyAssignmentDateRange = {}): Promise<MyDriverAssignment[]> {
   const { data } = await api.get<any[]>("/api/booking-assignments/me/driver", { params: filters });
   return data || [];

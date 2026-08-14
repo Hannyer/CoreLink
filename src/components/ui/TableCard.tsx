@@ -27,9 +27,10 @@ type TableCardProps<T> = {
   columns: Column<T>[];
   rowKey: (row: T) => React.Key;
   emptyText?: string;
-  headerExtra?: ReactNode; 
+  headerExtra?: ReactNode;
   footer?: ReactNode;
   hover?: boolean;
+  onRowClick?: (row: T) => void;
 };
 
 const wrapper: CSSProperties = { padding: "8px 12px", minHeight: 0, minWidth: 0 };
@@ -130,6 +131,7 @@ export function TableCard<T>({
   headerExtra,
   footer,
   hover = true,
+  onRowClick,
 }: TableCardProps<T>) {
   const isMobile = useMediaQuery('(max-width: 767.98px)');
   const visibleColumns = isMobile ? columns.filter(c => !c.hideOnMobile) : columns;
@@ -170,7 +172,11 @@ export function TableCard<T>({
           // Vista de cards para móvil
           <div style={{ ...scrollArea, overflow: isMobile ? "visible" : "auto" }}>
             {data.map((row) => (
-              <div key={String(rowKey(row))} style={cardMobile}>
+              <div
+                key={String(rowKey(row))}
+                style={{ ...cardMobile, cursor: onRowClick ? "pointer" : undefined }}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+              >
                 {visibleColumns.map((c) => {
                   const value = c.render ? c.render(row) : c.accessor ? c.accessor(row) : null;
                   return (
@@ -198,7 +204,8 @@ export function TableCard<T>({
                 {data.map((row) => (
                   <tr
                     key={rowKey(row)}
-                    style={hover ? rowHover : undefined}
+                    style={{ ...(hover ? rowHover : undefined), cursor: onRowClick ? "pointer" : undefined }}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
                     onMouseEnter={(e) => hover && (e.currentTarget.style.background = "#f1f5f9")}
                     onMouseLeave={(e) => hover && (e.currentTarget.style.background = "transparent")}
                   >

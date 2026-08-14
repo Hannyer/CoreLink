@@ -21,6 +21,7 @@ import OperatorPage from "@/page/operator/OperatorPage";
 import ReferencePointsPage from "@/page/referencePoints/ReferencePointsPage";
 import MyGuideAssignmentsPage from "@/page/myAssignments/MyGuideAssignmentsPage";
 import MyDriverAssignmentsPage from "@/page/myAssignments/MyDriverAssignmentsPage";
+import ReportsPage from "@/page/reports/ReportsPage";
 
 const router = createBrowserRouter([
   // Público
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
       { path: "/reference-points", element: <ReferencePointsPage /> },
       { path: "/security", element: <SecurityPermissionsPage /> },
       { path: "/bookings", element: <BookingsPage /> },
+      { path: "/reports", element: <ReportsPage /> },
       { path: "/operator", element: <OperatorPage /> },
       { path: "/my-guide-assignments", element: <MyGuideAssignmentsPage /> },
       { path: "/my-driver-assignments", element: <MyDriverAssignmentsPage /> },

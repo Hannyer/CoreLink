@@ -144,6 +144,12 @@ export async function fetchBookingsWithPagination(
   if (filters?.activityScheduleId) {
     params.activityScheduleId = filters.activityScheduleId;
   }
+  if (filters?.search && filters.search.trim() !== "") {
+    params.search = filters.search.trim();
+  }
+  if (filters?.orderBy) {
+    params.orderBy = filters.orderBy;
+  }
 
   const { data } = await api.get<any>("/api/bookings", { params });
 

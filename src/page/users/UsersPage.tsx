@@ -267,10 +267,6 @@ export default function UsersPage() {
       toast.error("El teléfono es requerido");
       return;
     }
-    if (!editingUser && !formData.password) {
-      toast.error("La contraseña es requerida");
-      return;
-    }
     if (!formData.roleId) {
       toast.error("El rol es requerido");
       return;
@@ -316,8 +312,12 @@ export default function UsersPage() {
         await updateUser(editingUser.id, payload);
         toast.success("Usuario actualizado correctamente");
       } else {
-        await createUser(formData);
-        toast.success("Usuario creado correctamente");
+        const createdUser = await createUser(formData);
+        if (createdUser.passwordSetupEmailSent === false) {
+          toast.warning("Usuario creado, pero no se pudo enviar el enlace de contraseña. Revisa la configuración de correo.");
+        } else {
+          toast.success("Usuario creado correctamente. Se envió el enlace para crear contraseña.");
+        }
       }
 
       setShowModal(false);
@@ -582,49 +582,47 @@ export default function UsersPage() {
             />
           </div>
 
-          {/* Fila 3: Contraseña */}
-          <div style={{ position: "relative" }}>
-            <FormInput
-              label={
-                editingUser
-                  ? "Nueva contraseña (dejar vacío para no cambiar)"
-                  : "Contraseña"
-              }
-              type={showPassword ? "text" : "password"}
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              required={!editingUser}
-              fullWidth
-              disabled={formLoading}
-              placeholder={
-                editingUser ? "••••••••" : "Ingrese una contraseña segura"
-              }
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: "absolute",
-                right: "12px",
-                top: "38px",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "4px",
-                display: "flex",
-                alignItems: "center",
-                color: "#64748b",
-              }}
-              tabIndex={-1}
-              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
+          {editingUser ? (
+            <div style={{ position: "relative" }}>
+              <FormInput
+                label="Nueva contraseña (dejar vacío para no cambiar)"
+                type={showPassword ? "text" : "password"}
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                fullWidth
+                disabled={formLoading}
+                placeholder="Nueva contraseña"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "38px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  color: "#64748b",
+                }}
+                tabIndex={-1}
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          ) : (
+            <div className="alert alert-info py-2 small" role="note">
+              Al crear el usuario se enviará un enlace a su correo para que genere su contraseña.
+            </div>
+          )}
 
-          {/* Fila 4: Rol */}
+          {/* Rol */}
           <FormCombobox
             label="Rol"
             options={roleOptions}

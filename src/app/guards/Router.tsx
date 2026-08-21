@@ -6,6 +6,7 @@ import PrivateRoute from "./PrivateRoute";
 import HomePage from "@/page/home/Home";
 import AboutPage from "@/page/about/About";
 import LoginPage from "@/page/Login/LoginPage";
+import ResetPasswordPage from "@/page/Login/ResetPasswordPage";
 import SettingsPage from "@/page/settings/SettingsPage";
 import GuidesPage from "@/page/guides/GuidesPage";
 import TransportsPage from "@/page/transports/TransportsPage";
@@ -26,6 +27,7 @@ import ReportsPage from "@/page/reports/ReportsPage";
 const router = createBrowserRouter([
   // Público
   { path: "/login", element: <LoginPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/", element: <Navigate to="/home" replace /> },
 
   // Privado (todo lo que vive con layout)

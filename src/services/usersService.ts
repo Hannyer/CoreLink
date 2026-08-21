@@ -37,6 +37,7 @@ function mapApiUser(raw: any): User {
     status: raw.status ?? true,
     createdAt: raw.createdAt ?? raw.created_at ?? "",
     updatedAt: raw.updatedAt ?? raw.updated_at ?? "",
+    passwordSetupEmailSent: raw.passwordSetupEmailSent ?? raw.password_setup_email_sent,
   };
 }
 
@@ -116,7 +117,6 @@ export async function createUser(payload: UserFormData): Promise<User> {
     email: payload.email.trim(),
     fullName: payload.fullName.trim(),
     phone: payload.phone.trim(),
-    password: payload.password,
     roleId: payload.roleId,
     status: payload.status ?? true,
   };

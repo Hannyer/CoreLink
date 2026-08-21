@@ -174,3 +174,10 @@
   background: #99f6e4;
   flex: 0 0 auto;
 }
+
+.auth-reset-box {
+  background: #f8fafc;
+  border: 1px solid var(--crm-border);
+  border-radius: 14px;
+  padding: 14px;
+}

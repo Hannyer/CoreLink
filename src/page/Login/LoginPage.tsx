@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { login } from "@/services/authService";
+import { login, requestPasswordReset } from "@/services/authService";
 import type { AxiosError } from "axios";
 import { CalendarCheck, Eye, EyeOff, Lock, Mail, MapPinned, ShieldCheck, UsersRound } from "lucide-react";
 
@@ -10,6 +10,11 @@ const LoginPage = () => {
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
   const [showPwd, setShowPwd]   = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
+  const [forgotError, setForgotError] = useState("");
 
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -30,6 +35,28 @@ const LoginPage = () => {
       setError(`${message}${status ? ` (Código ${status})` : ""}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const email = forgotEmail.trim().toLowerCase();
+    setForgotError("");
+    setForgotMessage("");
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setForgotError("Ingresa un correo valido para enviar el enlace.");
+      return;
+    }
+
+    try {
+      setForgotLoading(true);
+      const result = await requestPasswordReset({ email });
+      setForgotMessage(result.message || "Si el correo existe, recibiras un enlace de recuperacion.");
+    } catch (error) {
+      const err = error as AxiosError<{ message?: string }>;
+      setForgotError(err.response?.data?.message || err.message || "No se pudo enviar el enlace.");
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -114,7 +141,7 @@ const LoginPage = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="needs-validation" noValidate>
+          <form onSubmit={handleSubmit} className="needs-validation" autoComplete="off" noValidate>
             {/* Usuario */}
             <div className="mb-3">
               <label className="form-label text-white-50">Usuario o correo</label>
@@ -125,10 +152,10 @@ const LoginPage = () => {
                 <input
                   type="text"
                   className="form-control auth-input ps-5"
-                  placeholder="tu@empresa.com"
+                  placeholder="Correo electronico"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -144,10 +171,10 @@ const LoginPage = () => {
                 <input
                   type={showPwd ? "text" : "password"}
                   className="form-control auth-input ps-5 pe-10"
-                  placeholder="••••••••"
+                  placeholder="Contrasena"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
+                  autoComplete="off"
                   required
                 />
                 <button
@@ -171,10 +198,50 @@ const LoginPage = () => {
                 <button
                   type="button"
                   className="btn btn-link p-0 text-decoration-none text-white-50"
+                  onClick={() => {
+                    setShowForgot((current) => !current);
+                    setForgotEmail("");
+                    setForgotMessage("");
+                    setForgotError("");
+                  }}
+                  aria-expanded={showForgot}
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
+
+              {showForgot && (
+                <div className="auth-reset-box mt-3">
+                  <label className="form-label text-white-50 mb-2">Correo de la cuenta</label>
+                  <input
+                    type="email"
+                    className="form-control auth-input"
+                    placeholder="Correo electronico"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    autoComplete="off"
+                    disabled={forgotLoading}
+                  />
+                  <button
+                    type="button"
+                    className="btn auth-cta w-100 mt-3"
+                    onClick={handleForgotPassword}
+                    disabled={forgotLoading}
+                  >
+                    {forgotLoading ? "Enviando..." : "Enviar enlace"}
+                  </button>
+                  {forgotMessage && (
+                    <div className="alert alert-success py-2 small mt-3 mb-0" role="status">
+                      {forgotMessage}
+                    </div>
+                  )}
+                  {forgotError && (
+                    <div className="alert alert-danger py-2 small mt-3 mb-0" role="alert">
+                      {forgotError}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="form-text mb-3 text-white-50">

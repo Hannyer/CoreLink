@@ -67,6 +67,25 @@ export async function login(payload: {
   return { token: data.token, user };
 }
 
+export async function requestPasswordReset(payload: { email: string }): Promise<{ message: string }> {
+  const { data } = await api.post<{ message: string }>(
+    "/api/auth/forgot-password",
+    payload
+  );
+  return data;
+}
+
+export async function resetPassword(payload: {
+  token: string;
+  newPassword: string;
+}): Promise<{ message: string }> {
+  const { data } = await api.post<{ message: string }>(
+    "/api/auth/reset-password",
+    payload
+  );
+  return data;
+}
+
 export function logout() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");

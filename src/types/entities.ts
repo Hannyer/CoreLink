@@ -405,6 +405,7 @@ export interface User {
   status: boolean;
   createdAt: string;
   updatedAt: string;
+  passwordSetupEmailSent?: boolean;
 }
 
 export interface UserFormData {

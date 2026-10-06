@@ -301,7 +301,7 @@ function GuideAssignmentsSubmodule({ mode }: { mode: "assign" | "edit" }) {
               <div key={item.activityScheduleId} className="op-section-card">
                 <div className="d-flex justify-content-between gap-3 flex-wrap">
                   <div>
-                    <div className="fw-semibold" style={{ color: "#e2e8f0" }}>
+                    <div className="op-activity-name fw-semibold">
                       {item.activityTitle}
                     </div>
                     <div className="op-panel-meta">
@@ -571,7 +571,7 @@ function TransportAssignmentsSubmodule() {
               <div key={item.bookingId} className="op-section-card">
                 <div className="d-flex justify-content-between gap-3 flex-wrap">
                   <div>
-                    <div className="fw-semibold" style={{ color: "#e2e8f0" }}>
+                    <div className="op-activity-name fw-semibold">
                       {item.activityTitle}
                     </div>
                     <div className="op-panel-meta">{formatDateTime(item.scheduledStart)}</div>

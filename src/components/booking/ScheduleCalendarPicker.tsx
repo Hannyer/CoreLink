@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, Users } from "lucide-react";
 import type { AvailableSchedule } from "@/types/entities";
+import { capitalizeFirst } from "@/utils/dateUtils";
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -153,7 +154,7 @@ export default function ScheduleCalendarPicker({ schedules, value, onChange, dis
     setSelectedDay(null);
     setPickerOpen(false);
   };
-  const monthTitle = viewDate.toLocaleDateString("es-CR", { month: "long", year: "numeric" });
+  const monthTitle = capitalizeFirst(viewDate.toLocaleDateString("es-CR", { month: "long", year: "numeric" }));
 
   return (
     <div className={`sp ${disabled ? "opacity-50 pe-none" : ""}`}>
@@ -230,7 +231,7 @@ export default function ScheduleCalendarPicker({ schedules, value, onChange, dis
         <div className="cal-day-panel" ref={dayPanelRef}>
           <div className="cal-day-title">
             <Clock size={16} />
-            {new Date(`${selectedDay}T00:00:00`).toLocaleDateString("es-CR", { weekday: "long", day: "numeric", month: "long" })}
+            {capitalizeFirst(new Date(`${selectedDay}T00:00:00`).toLocaleDateString("es-CR", { weekday: "long", day: "numeric", month: "long" }))}
           </div>
 
           <div className="d-flex flex-column gap-2">

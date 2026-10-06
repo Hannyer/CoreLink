@@ -1,6 +1,8 @@
 import React, { type CSSProperties, type ReactNode } from "react";
 import { Loading } from "./Loading";
 import { Badge } from "./Badge";
+import { EmptyState } from "./EmptyState";
+import { Inbox } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export type Column<T> = {
@@ -26,7 +28,8 @@ type TableCardProps<T> = {
   data: T[];
   columns: Column<T>[];
   rowKey: (row: T) => React.Key;
-  emptyText?: string;
+  /** texto o contenido a mostrar cuando no hay datos */
+  emptyText?: ReactNode;
   headerExtra?: ReactNode;
   footer?: ReactNode;
   hover?: boolean;
@@ -44,7 +47,7 @@ const card: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   minHeight: 0,
-  maxHeight: "calc(100vh - 260px)",
+  maxHeight: "calc(100vh - 170px)",
   overflow: "hidden",
 };
 
@@ -167,7 +170,11 @@ export function TableCard<T>({
         {loading ? (
           <Loading variant="spinner" size="md" message="Cargando…" />
         ) : data.length === 0 ? (
-          <div style={{ color: "#64748b", padding: "12px 4px", textAlign: "center" }}>{emptyText}</div>
+          typeof emptyText === "string" ? (
+            <EmptyState icon={<Inbox />} title={emptyText} size="sm" />
+          ) : (
+            emptyText
+          )
         ) : isMobile ? (
           // Vista de cards para móvil
           <div style={{ ...scrollArea, overflow: isMobile ? "visible" : "auto" }}>

@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, X, Search } from 'lucide-react';
 
 // Re-exportar SelectOption para compatibilidad
+import type { SelectOption } from './FormSelect';
 export type { SelectOption } from './FormSelect';
 
 export interface FormComboboxProps {
@@ -45,8 +47,11 @@ export function FormCombobox({
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null);
 
-  const inputId = `combobox-${Math.random().toString(36).substr(2, 9)}`;
+  const inputId = `combobox-${useId()}`;
 
   // Filtrar opciones basado en el término de búsqueda
   const filteredOptions = options.filter((option) =>
@@ -60,7 +65,12 @@ export function FormCombobox({
   // Cerrar cuando se hace click fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !dropdownRef.current?.contains(target)
+      ) {
         setIsOpen(false);
         setSearchTerm('');
         setFocusedIndex(-1);
@@ -73,12 +83,40 @@ export function FormCombobox({
     }
   }, [isOpen]);
 
+  // Posicionar el desplegable (se renderiza en un portal para que no lo recorten
+  // contenedores con overflow: hidden, como TableCard o Modal)
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setDropdownPos(null);
+      return;
+    }
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < 320 && rect.top > spaceBelow;
+      setDropdownPos({
+        top: openUp ? rect.top - 4 : rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        openUp,
+      });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
   // Enfocar el input de búsqueda cuando se abre
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
+    if (isOpen && dropdownPos && searchInputRef.current) {
+      searchInputRef.current.focus({ preventScroll: true });
     }
-  }, [isOpen]);
+  }, [isOpen, dropdownPos !== null]);
 
   // Scroll al elemento enfocado
   useEffect(() => {
@@ -196,6 +234,7 @@ export function FormCombobox({
 
       <div style={{ position: 'relative' }}>
         <button
+          ref={triggerRef}
           type="button"
           id={inputId}
           style={{
@@ -252,19 +291,21 @@ export function FormCombobox({
           </div>
         </button>
 
-        {isOpen && (
+        {isOpen && dropdownPos && createPortal(
           <div
+            ref={dropdownRef}
             style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '4px',
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: dropdownPos.width,
+              minWidth: 220,
+              transform: dropdownPos.openUp ? 'translateY(-100%)' : undefined,
               backgroundColor: '#ffffff',
               border: '1px solid rgba(0,0,0,0.15)',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              zIndex: 1000,
+              zIndex: 2000,
               maxHeight: '300px',
               display: 'flex',
               flexDirection: 'column',
@@ -363,7 +404,8 @@ export function FormCombobox({
                 ))
               )}
             </ul>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 

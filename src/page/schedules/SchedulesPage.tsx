@@ -19,7 +19,8 @@ import { FormCombobox, type SelectOption } from "@/components/form/FormCombobox"
 import { FormCheckbox } from "@/components/form/FormCheckbox";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useToastContext } from "@/contexts/ToastContext";
-import { Edit, Trash2, Plus, Calendar, Users, X } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Edit, Trash2, Plus, Calendar, CalendarSearch, Users, X } from "lucide-react";
 import type {
   ActivitySchedule,
   ActivityScheduleFormData,
@@ -53,7 +54,7 @@ type ScheduleRow = ActivitySchedule & {
 
 export default function SchedulesPage() {
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showAddAttendeesModal, setShowAddAttendeesModal] = useState(false);
@@ -645,9 +646,21 @@ export default function SchedulesPage() {
         columns={columns}
         rowKey={(row) => row.id}
         emptyText={
-          selectedActivityId
-            ? "No hay planeaciones para esta actividad"
-            : "Selecciona una actividad para ver sus planeaciones"
+          selectedActivityId ? (
+            <EmptyState
+              icon={<Calendar />}
+              title="Sin planeaciones"
+              message="Esta actividad aún no tiene planeaciones. Crea una con el botón “Nueva planeación”."
+              size="sm"
+            />
+          ) : (
+            <EmptyState
+              icon={<CalendarSearch />}
+              title="Selecciona una actividad"
+              message="Elige una actividad en el filtro de arriba para ver y gestionar sus planeaciones."
+              size="md"
+            />
+          )
         }
         headerExtra={headerExtra}
         footer={

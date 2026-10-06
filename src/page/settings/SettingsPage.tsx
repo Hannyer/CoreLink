@@ -4,6 +4,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { useToastContext } from "@/contexts/ToastContext";
 import { Check, X, Pencil } from "lucide-react";
 import type { AxiosError } from "axios";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 /**
  * Función helper para extraer el mensaje de error del formato del API
@@ -34,6 +35,7 @@ export default function SettingsPage() {
   const [editingValue, setEditingValue] = useState<string>("");
   const [savingId, setSavingId] = useState<number | null>(null);
   const toast = useToastContext();
+  const isMobile = useMediaQuery("(max-width: 767.98px)");
 
   useEffect(() => {
     loadConfigurations();
@@ -87,6 +89,64 @@ export default function SettingsPage() {
     return <span className="badge text-bg-light text-dark">—</span>;
   };
 
+  const keysText = (row: Configuration) =>
+    [row.key01, row.key02, row.key03, row.key04, row.key05, row.key06].filter(Boolean).join(" · ") || "—";
+
+  const renderValue = (row: Configuration) => (
+    editingId === row.pkConfiguration ? (
+        <div className="d-flex align-items-center gap-2">
+          <input
+            type="text"
+            className="form-control form-control-sm"
+            value={editingValue}
+            onChange={(e) => setEditingValue(e.target.value)}
+            disabled={savingId === row.pkConfiguration}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleSaveValue(row.pkConfiguration);
+              } else if (e.key === "Escape") {
+                handleCancelEdit();
+              }
+            }}
+          />
+          <button
+            className="btn btn-sm btn-success"
+            onClick={() => handleSaveValue(row.pkConfiguration)}
+            disabled={savingId === row.pkConfiguration}
+            title="Guardar"
+          >
+            {savingId === row.pkConfiguration ? (
+              <div className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} />
+            ) : (
+              <Check size={14} />
+            )}
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={handleCancelEdit}
+            disabled={savingId === row.pkConfiguration}
+            title="Cancelar"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-truncate" style={{ maxWidth: 260 }}>
+            {row.value ?? "—"}
+          </span>
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={() => handleStartEdit(row)}
+            title="Editar valor"
+          >
+            <Pencil size={14} />
+          </button>
+        </div>
+      )
+  );
+
   return (
     <div className="card shadow-sm">
       <div className="card-header bg-white d-flex flex-wrap align-items-center gap-2">
@@ -104,13 +164,35 @@ export default function SettingsPage() {
       <div className="card-body p-0">
         {err && <div className="alert alert-danger m-3">{err}</div>}
 
+        {isMobile ? (
+          <div className="d-flex flex-column gap-2 p-2">
+            {loading ? (
+              <div className="text-center p-4">
+                <div className="spinner-border spinner-border-sm me-2" /> Cargando…
+              </div>
+            ) : (!items || items.length === 0) ? (
+              <div className="text-center p-4 text-muted">Sin resultados</div>
+            ) : (
+              items.map(row => (
+                <div key={row.pkConfiguration} className="border rounded-3 p-3">
+                  <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
+                    <span className="fw-semibold">{row.description ?? "—"}</span>
+                    {estadoBadge(row.estado)}
+                  </div>
+                  <div className="small text-muted mb-2 text-break">{keysText(row)}</div>
+                  <div className="text-break">{renderValue(row)}</div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
         <div className="table-responsive">
           <table className="table align-middle mb-0">
             <thead className="table-light">
               <tr>
                 <th>Descripción</th>
-                <th>Keys</th>
-                <th>Value</th>
+                <th>Claves</th>
+                <th>Valor</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -127,62 +209,9 @@ export default function SettingsPage() {
                     <td className="text-truncate" style={{ maxWidth: 360 }}>
                       {row.description ?? "—"}
                     </td>
-                    <td className="small text-muted">
-                      {[row.key01, row.key02, row.key03, row.key04, row.key05, row.key06].filter(Boolean).join(" · ") || "—"}
-                    </td>
+                    <td className="small text-muted">{keysText(row)}</td>
                     <td style={{ maxWidth: 300 }}>
-                      {editingId === row.pkConfiguration ? (
-                        <div className="d-flex align-items-center gap-2">
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            value={editingValue}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            disabled={savingId === row.pkConfiguration}
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                handleSaveValue(row.pkConfiguration);
-                              } else if (e.key === "Escape") {
-                                handleCancelEdit();
-                              }
-                            }}
-                          />
-                          <button
-                            className="btn btn-sm btn-success"
-                            onClick={() => handleSaveValue(row.pkConfiguration)}
-                            disabled={savingId === row.pkConfiguration}
-                            title="Guardar"
-                          >
-                            {savingId === row.pkConfiguration ? (
-                              <div className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} />
-                            ) : (
-                              <Check size={14} />
-                            )}
-                          </button>
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            onClick={handleCancelEdit}
-                            disabled={savingId === row.pkConfiguration}
-                            title="Cancelar"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="d-flex align-items-center gap-2">
-                          <span className="text-truncate" style={{ maxWidth: 260 }}>
-                            {row.value ?? "—"}
-                          </span>
-                          <button
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => handleStartEdit(row)}
-                            title="Editar valor"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                        </div>
-                      )}
+                      {renderValue(row)}
                     </td>
                     <td>{estadoBadge(row.estado)}</td>
                   </tr>
@@ -191,6 +220,7 @@ export default function SettingsPage() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       <div className="card-footer bg-white">

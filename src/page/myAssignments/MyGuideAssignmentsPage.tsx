@@ -10,6 +10,7 @@ import {
   type ScheduleBooking,
 } from "@/services/bookingAssignmentsService";
 import { useToastContext } from "@/contexts/ToastContext";
+import { capitalizeFirst } from "@/utils/dateUtils";
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -255,7 +256,7 @@ export default function MyGuideAssignmentsPage() {
     setPickerOpen((open) => !open);
   };
 
-  const monthTitle = viewDate.toLocaleDateString("es-CR", { month: "long", year: "numeric" });
+  const monthTitle = capitalizeFirst(viewDate.toLocaleDateString("es-CR", { month: "long", year: "numeric" }));
 
   return (
     <div>
@@ -399,9 +400,9 @@ export default function MyGuideAssignmentsPage() {
               <div className="cal-sheet-head">
                 <h3 className="cal-sheet-title">
                   <Clock size={16} />
-                  {new Date(`${selectedDay}T00:00:00`).toLocaleDateString("es-CR", {
+                  {capitalizeFirst(new Date(`${selectedDay}T00:00:00`).toLocaleDateString("es-CR", {
                     weekday: "long", day: "numeric", month: "long",
-                  })}
+                  }))}
                 </h3>
                 <button type="button" className="cal-sheet-close" onClick={closeSheet} aria-label="Cerrar">
                   <X size={18} />

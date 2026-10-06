@@ -327,6 +327,61 @@ body {
   border-color: var(--crm-border) !important;
 }
 
+.glass-card .op-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.glass-card .op-tab {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.glass-card .op-btn-save {
+  background: var(--crm-primary) !important;
+  border-color: var(--crm-primary) !important;
+  color: #fff !important;
+}
+
+.glass-card .op-btn-save:hover:not(:disabled) {
+  background: var(--crm-primary-strong) !important;
+}
+
+.glass-card .op-btn-refresh {
+  border-color: var(--crm-border) !important;
+  color: var(--crm-muted) !important;
+}
+
+.glass-card .op-btn-refresh:hover {
+  color: var(--crm-text) !important;
+}
+
+.glass-card .op-guide-chip,
+.glass-card .op-count-badge,
+.glass-card .op-info-strip {
+  background: var(--crm-primary-soft) !important;
+  border-color: rgba(15,118,110,.25) !important;
+  color: var(--crm-primary-strong) !important;
+}
+
+.glass-card .op-guide-item--selected {
+  background: var(--crm-primary-soft) !important;
+  border-color: rgba(15,118,110,.3) !important;
+  color: var(--crm-primary-strong) !important;
+}
+
+.glass-card .op-guide-item--selected .op-guide-check {
+  background: var(--crm-primary) !important;
+  border-color: var(--crm-primary) !important;
+}
+
+.glass-card .op-warn-strip {
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+
 @media (max-width: 767.98px) {
   .content-surface {
     padding: 3.75rem .75rem .75rem !important;
@@ -368,7 +423,7 @@ body {
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--crm-text);
-  text-transform: capitalize;
+  text-transform: none;
   margin: 0;
   min-width: 12rem;
   text-align: center;
@@ -460,7 +515,7 @@ body {
   font-size: .95rem;
   font-weight: 600;
   color: var(--crm-text);
-  text-transform: capitalize;
+  text-transform: none;
   margin-bottom: .75rem;
   display: flex;
   align-items: center;
@@ -516,7 +571,7 @@ body {
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--crm-text);
-  text-transform: capitalize;
+  text-transform: none;
   cursor: pointer;
   transition: all .15s ease;
 }
@@ -670,7 +725,7 @@ body {
 }
 .cal-sheet-title {
   font-size: .98rem; font-weight: 700; color: var(--crm-text);
-  text-transform: capitalize; margin: 0;
+  margin: 0;
   display: flex; align-items: center; gap: .4rem;
 }
 .cal-sheet-close {

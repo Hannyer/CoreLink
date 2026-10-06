@@ -49,3 +49,8 @@ export function formatDisplayDate(dateStr: string | undefined): string {
     day: "numeric",
   });
 }
+
+/** Pone en mayúscula solo la primera letra ("octubre de 2026" → "Octubre de 2026"). */
+export function capitalizeFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

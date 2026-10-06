@@ -23,11 +23,12 @@ import ReferencePointsPage from "@/page/referencePoints/ReferencePointsPage";
 import MyGuideAssignmentsPage from "@/page/myAssignments/MyGuideAssignmentsPage";
 import MyDriverAssignmentsPage from "@/page/myAssignments/MyDriverAssignmentsPage";
 import ReportsPage from "@/page/reports/ReportsPage";
+import RouteErrorPage from "@/page/commons/RouteErrorPage";
 
 const router = createBrowserRouter([
   // Público
-  { path: "/login", element: <LoginPage /> },
-  { path: "/reset-password", element: <ResetPasswordPage /> },
+  { path: "/login", element: <LoginPage />, errorElement: <RouteErrorPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage />, errorElement: <RouteErrorPage /> },
   { path: "/", element: <Navigate to="/home" replace /> },
 
   // Privado (todo lo que vive con layout)
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
         <MainLayout />
       </PrivateRoute>
     ),
+    errorElement: <RouteErrorPage />,
     children: [
       { path: "/home", element: <HomePage /> },
       { path: "/about", element: <AboutPage /> },

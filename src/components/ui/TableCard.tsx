@@ -47,9 +47,13 @@ const card: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   minHeight: 0,
-  maxHeight: "calc(100vh - 170px)",
   overflow: "hidden",
 };
+
+/** Alto estimado de una fila, para reservarle espacio al área de datos. */
+const ALTO_FILA = 68;
+/** Filas que siempre deben verse sin tener que hacer scroll dentro de la tabla. */
+const FILAS_MINIMAS = 5;
 
 const titleStyle: CSSProperties = { marginBottom: "14px", fontWeight: 600, color: "#0f172a" };
 
@@ -84,6 +88,10 @@ const rowHover: CSSProperties = { transition: "background 0.2s ease" };
 const scrollArea: CSSProperties = {
   flex: 1,
   minHeight: 0,
+  // En pantallas altas la tabla hace scroll interna y el encabezado queda fijo.
+  // En pantallas bajas gana el minHeight (regla de CSS) y entonces es la página
+  // la que hace scroll, en vez de que el área de filas se encoja hasta desaparecer.
+  maxHeight: "calc(100vh - 260px)",
   overflow: "auto",
 };
 
@@ -139,6 +147,12 @@ export function TableCard<T>({
   const isMobile = useMediaQuery('(max-width: 767.98px)');
   const visibleColumns = isMobile ? columns.filter(c => !c.hideOnMobile) : columns;
 
+  // Espacio reservado para las filas: hasta FILAS_MINIMAS, más el encabezado.
+  // Se calcula con los datos que hay para no dejar un hueco vacío cuando son pocos.
+  const areaDatos: CSSProperties = isMobile
+    ? { ...scrollArea, minHeight: 0, maxHeight: "none", overflow: "visible" }
+    : { ...scrollArea, minHeight: Math.min(data.length, FILAS_MINIMAS) * ALTO_FILA + 52 };
+
   return (
     <div style={wrapper}>
       <div
@@ -177,7 +191,7 @@ export function TableCard<T>({
           )
         ) : isMobile ? (
           // Vista de cards para móvil
-          <div style={{ ...scrollArea, overflow: isMobile ? "visible" : "auto" }}>
+          <div style={areaDatos}>
             {data.map((row) => (
               <div
                 key={String(rowKey(row))}
@@ -198,7 +212,7 @@ export function TableCard<T>({
           </div>
         ) : (
           // Vista de tabla para desktop
-          <div style={scrollArea}>
+          <div style={areaDatos}>
             <table style={table}>
               <thead>
                 <tr>

@@ -219,7 +219,11 @@ body {
 .content-surface {
   background: transparent;
   min-height: 0;
-  overflow: hidden;
+  /* La zona de contenido es la que hace scroll. Si estuviera en "hidden",
+     en pantallas bajas (o con el escalado de Windows al 125%) lo que no cabe
+     se recorta y las tablas se quedan sin espacio para mostrar filas. */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .glass-card {
   background: rgba(255,255,255,0.94);
